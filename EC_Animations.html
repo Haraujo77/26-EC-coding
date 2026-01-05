@@ -1,0 +1,1231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Slash Fields — p5.js (single file)</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+    canvas { display: block; }
+
+    #ui {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: min(420px, calc(100vw - 24px));
+      z-index: 10;
+      font: 12px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: rgba(255,255,255,0.92);
+      background: rgba(0,0,0,0.58);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 14px;
+      backdrop-filter: blur(10px);
+      padding: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    #ui.hidden { display: none; }
+    #ui h3 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.2px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+
+    #ui .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin: 6px 0; }
+    #ui label { opacity: 0.9; }
+    #ui input[type="range"], #ui select { width: 210px; }
+
+    #ui textarea {
+      width: 100%;
+      height: 76px;
+      resize: vertical;
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 8px;
+      outline: none;
+      box-sizing: border-box;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    #ui button {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.92);
+      border-radius: 12px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+    #ui button:hover { background: rgba(255,255,255,0.12); }
+
+    .tinybtn {
+      width: auto !important;
+      padding: 6px 8px !important;
+      border-radius: 10px !important;
+      font-weight: 700;
+      font-size: 11px;
+      background: rgba(255,255,255,0.07);
+    }
+
+    #showUI {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 11;
+      display: none;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(0,0,0,0.55);
+      color: rgba(255,255,255,0.92);
+      border-radius: 999px;
+      padding: 8px 10px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      font: 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      font-weight: 800;
+    }
+    #showUI:hover { background: rgba(255,255,255,0.08); }
+
+    #hint {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      z-index: 10;
+      font: 12px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: rgba(255,255,255,0.82);
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      padding: 8px 10px;
+      max-width: min(760px, calc(100vw - 24px));
+      backdrop-filter: blur(10px);
+    }
+
+    #banner {
+      position: fixed;
+      left: 12px;
+      top: 12px;
+      z-index: 20;
+      font: 12px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: rgba(255,255,255,0.92);
+      background: rgba(180,20,20,0.50);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 12px;
+      padding: 8px 10px;
+      max-width: min(760px, calc(100vw - 24px));
+      backdrop-filter: blur(10px);
+      display: none;
+    }
+
+    code { opacity: 0.95; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <div id="banner"></div>
+
+  <button id="showUI" title="Show controls (H)">Show controls (H)</button>
+
+  <div id="ui">
+    <h3>
+      <span>Slash Fields</span>
+      <button id="hideBtn" class="tinybtn" title="Hide controls (H)">Hide (H)</button>
+    </h3>
+
+    <div class="row">
+      <label for="preset">Preset</label>
+      <select id="preset"></select>
+    </div>
+
+    <div class="row">
+      <label for="renderMode">Render</label>
+      <select id="renderMode">
+        <option value="glyph">Glyphs (fast)</option>
+        <option value="line">Lines</option>
+      </select>
+    </div>
+
+    <div class="row"><label for="density">Density</label><input id="density" type="range" min="8" max="48" step="1" /></div>
+    <div class="row"><label for="size">Size</label><input id="size" type="range" min="6" max="80" step="1" /></div>
+    <div class="row"><label for="thick">Thickness</label><input id="thick" type="range" min="0.6" max="10" step="0.1" /></div>
+    <div class="row"><label for="copies">Copies per cell</label><input id="copies" type="range" min="1" max="4" step="1" /></div>
+    <div class="row"><label for="tilt">Field rotation</label><input id="tilt" type="range" min="-1.5" max="1.5" step="0.01" /></div>
+
+    <div class="row"><label for="warp">Warp</label><input id="warp" type="range" min="0" max="2" step="0.01" /></div>
+    <div class="row"><label for="persp">Perspective</label><input id="persp" type="range" min="0" max="2" step="0.01" /></div>
+    <div class="row"><label for="swirl">Swirl</label><input id="swirl" type="range" min="0" max="2" step="0.01" /></div>
+
+    <div class="row"><label for="trail">Trails</label><input id="trail" type="range" min="0" max="255" step="1" /></div>
+    <div class="row"><label for="grain">Grain</label><input id="grain" type="range" min="0" max="1" step="0.01" /></div>
+
+    <div class="row"><label for="text">Line 1 = pattern, rest = overlay</label><span id="fps" class="mono" style="opacity:.8;">-- fps</span></div>
+    <textarea id="text" spellcheck="false"></textarea>
+
+    <div class="row" style="grid-template-columns: 1fr 1fr; gap: 8px;">
+      <button id="reset" title="Reset time">Reset time</button>
+      <button id="clear" title="Clear trails">Clear</button>
+    </div>
+  </div>
+
+  <div id="hint">
+    Line 1 controls glyphs (e.g. <code>/</code>, <code>////</code>, <code>/-|</code>, <code>RH</code>). Keys: <b>1–6</b> presets · <b>Space</b> pause · <b>S</b> screenshot · <b>H</b> hide controls.
+  </div>
+
+  <script>
+  "use strict";
+
+  // ======================================================
+  //  EXPOSED VARIABLES (edit freely)
+  // ======================================================
+  const CONFIG = {
+    // Rendering
+    renderMode: "glyph",        // "glyph" | "line"
+    uiVisible: true,
+
+    // Glyphs
+    glyphs: "/",               // repeating pattern
+    glyphFont: "ui-monospace", // CSS font name
+    glyphWeight: 800,
+    glyphRotationOffset: 0.0,   // radians
+
+    // Core
+    preset: "Tunnel",
+    density: 22,
+    glyphSize: 26,
+    thickness: 3.0,             // thickness for both glyph + line
+    copiesPerCell: 2,
+    copySpread: 0.28,
+
+    // Motion
+    speed: 1.0,
+    fieldRotation: -0.55,
+
+    // Warp
+    warp: 1.0,
+    perspective: 1.15,
+    swirl: 0.75,
+
+    // Lighting
+    minAlpha: 14,
+    maxAlpha: 255,
+    vignette: 0.35,
+
+    // Trails / look
+    trailsAlpha: 28,
+    grain: 0.22,
+
+    // Overlay text (optional)
+    overlayLines: ["SLASH FIELDS", "EDIT ME"],
+    overlaySize: 26,
+    overlayAlpha: 120,
+
+    // Performance
+    pixelDensity: 1,            // keep 1 for speed in browser previews
+    sizeQuantStep: 2,           // glyph cache quantization step (px)
+    grainTileSize: 256,         // precomputed tile size
+
+    // Presets
+    presets: ["Tunnel", "Sphere", "Vortex", "Ripple", "WavePlane", "Orbit"]
+  };
+  window.CONFIG = CONFIG;
+
+  // ======================================================
+  //  Self-tests (non-blocking)
+  // ======================================================
+  function parseTextBlock(text) {
+    const safe = String(text ?? "");
+    // IMPORTANT: remove CR, keep LF, then split on LF
+    const lines = safe.replace(/\r/g, "").split("\n");
+    const glyphLine = (lines[0] ?? "/").trim();
+    const glyphs = glyphLine.length ? glyphLine : "/";
+    const overlays = lines.slice(1).map(s => s.trim()).filter(Boolean);
+    return { glyphs, overlays, lines };
+  }
+
+  function quantizeSize(px) {
+    const step = Math.max(1, CONFIG.sizeQuantStep | 0);
+    return Math.max(step, Math.round(px / step) * step);
+  }
+
+  (function runSelfTests() {
+    try {
+      console.assert(typeof CONFIG.glyphs === "string" && CONFIG.glyphs.length > 0, "glyphs must be non-empty");
+      console.assert(CONFIG.density > 0, "density must be > 0");
+      console.assert(CONFIG.glyphSize > 0, "glyphSize must be > 0");
+      console.assert(CONFIG.copiesPerCell >= 1 && CONFIG.copiesPerCell <= 4, "copiesPerCell must be 1..4");
+
+      // Keep existing tests (but fix their string literals)
+      {
+        const a = parseTextBlock("/\nHELLO\nWORLD");
+        console.assert(a.glyphs === "/", "parseTextBlock glyphs");
+        console.assert(a.overlays.length === 2, "parseTextBlock overlays");
+      }
+      {
+        const b = parseTextBlock("\r\n   \r\nX");
+        console.assert(b.glyphs === "/", "blank glyph line defaults to /");
+        console.assert(b.overlays[0] === "X", "CRLF handled");
+      }
+      {
+        const old = CONFIG.sizeQuantStep;
+        CONFIG.sizeQuantStep = 4;
+        const q = quantizeSize(13);
+        console.assert(q === 12 || q === 16, "quantizeSize should snap");
+        CONFIG.sizeQuantStep = old;
+      }
+
+      // Added tests
+      {
+        const c = parseTextBlock("////\n\nA\n\nB\n");
+        console.assert(c.glyphs === "////", "should keep pattern");
+        console.assert(c.overlays.length === 2 && c.overlays[0] === "A" && c.overlays[1] === "B", "should ignore empty overlay lines");
+      }
+      {
+        const d = parseTextBlock(null);
+        console.assert(d.glyphs === "/", "null should default to /");
+      }
+    } catch (e) {
+      console.warn("Self-tests had an issue:", e);
+    }
+  })();
+
+  // ======================================================
+  //  Utilities
+  // ======================================================
+  const TAU = Math.PI * 2;
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const rot2 = (x, y, a) => {
+    const c = Math.cos(a), s = Math.sin(a);
+    return [x * c - y * s, x * s + y * c];
+  };
+
+  function hash2(x, y) {
+    let n = (x * 374761393 + y * 668265263) | 0;
+    n = (n ^ (n >>> 13)) * 1274126177;
+    n = (n ^ (n >>> 16)) >>> 0;
+    return (n / 4294967296);
+  }
+  function vnoise2(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const u = smooth(xf), v = smooth(yf);
+    const a = hash2(xi, yi);
+    const b = hash2(xi + 1, yi);
+    const c = hash2(xi, yi + 1);
+    const d = hash2(xi + 1, yi + 1);
+    const ab = lerp(a, b, u);
+    const cd = lerp(c, d, u);
+    return lerp(ab, cd, v);
+  }
+  function fbm(x, y, oct) {
+    let v = 0;
+    let a = 0.5;
+    let f = 1;
+    const o = (oct == null) ? 4 : oct;
+    for (let i = 0; i < o; i++) {
+      v += a * vnoise2(x * f, y * f);
+      f *= 2;
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  function banner(msg) {
+    const el = document.getElementById("banner");
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+
+  // ======================================================
+  //  Time (pause/resume)
+  // ======================================================
+  const Time = {
+    start: performance.now(),
+    pausedAt: 0,
+    isPaused: false,
+    reset() {
+      this.start = performance.now();
+      this.pausedAt = 0;
+      this.isPaused = false;
+    },
+    togglePause() {
+      this.isPaused = !this.isPaused;
+      if (this.isPaused) {
+        this.pausedAt = (performance.now() - this.start) / 1000;
+      } else {
+        this.start = performance.now() - this.pausedAt * 1000;
+      }
+    },
+    nowSeconds() {
+      return this.isPaused ? this.pausedAt : ((performance.now() - this.start) / 1000);
+    }
+  };
+
+  // ======================================================
+  //  Field mapping
+  // ======================================================
+  function mapCell(u, v, t) {
+    const r = Math.min(2, Math.sqrt(u * u + v * v));
+    const rr = clamp01(r);
+
+    const n = fbm(u * 1.2 + t * 0.18, v * 1.2 - t * 0.14, 4);
+    const wig = (n - 0.5) * 0.35 * CONFIG.warp;
+
+    let x = u;
+    let y = v;
+    let z = 0;
+
+    const preset = CONFIG.preset;
+
+    if (preset === "Tunnel") {
+      const depth = 0.15 + 3.8 * Math.pow(1 - clamp01(rr), 1.9);
+      z = depth + 0.55 * wig;
+      const tw = (1 - rr) * CONFIG.swirl;
+      const a = tw * 1.2 * Math.sin(t * 0.7);
+      [x, y] = rot2(x, y, a);
+      x = x * (1 + 0.25 * CONFIG.warp * rr * rr);
+      y = y * (1 + 0.10 * CONFIG.warp * rr);
+
+    } else if (preset === "Sphere") {
+      const theta = u * Math.PI;
+      const phi = v * (Math.PI * 0.52);
+      const cx = Math.cos(phi) * Math.sin(theta);
+      const cy = Math.sin(phi);
+      const cz = Math.cos(phi) * Math.cos(theta);
+
+      const ay = t * 0.42 * CONFIG.speed;
+      const ax = 0.55 + 0.22 * Math.sin(t * 0.35);
+
+      let X = cx;
+      let Y = cy;
+      let Z = cz;
+      [X, Z] = rot2(X, Z, ay);
+      [Y, Z] = rot2(Y, Z, ax);
+
+      x = X * (1 + 0.12 * wig);
+      y = Y * (1 + 0.12 * wig);
+      z = 1.45 + Z * 1.45;
+
+    } else if (preset === "Vortex") {
+      const spin = (1 - rr) * (1 - rr) * (1.8 * CONFIG.swirl);
+      const a = spin * 2.3 + t * 0.55 * CONFIG.speed;
+      [x, y] = rot2(x, y, a);
+      z = 0.35 + 2.2 * (1 - rr) + 0.75 * Math.sin(t * 0.8 + rr * 6 + wig);
+
+    } else if (preset === "Ripple") {
+      const w = Math.sin(rr * 10 - t * 1.35 * CONFIG.speed);
+      z = 0.55 + 2.2 * (1 - rr) + 0.95 * w * CONFIG.warp;
+      const a = 0.7 * w * CONFIG.swirl;
+      [x, y] = rot2(x, y, a);
+
+    } else if (preset === "WavePlane") {
+      z = 0.55
+        + 0.85 * Math.sin((u * 2.2 + t * 0.9 * CONFIG.speed))
+        + 0.85 * Math.sin((v * 2.0 - t * 0.7 * CONFIG.speed));
+      z = 0.85 + 0.85 * z * 0.55;
+      x = u + 0.12 * wig;
+      y = v + 0.10 * wig;
+
+    } else if (preset === "Orbit") {
+      const a = t * 0.35 * CONFIG.speed;
+      const ox = 0.35 * Math.cos(a);
+      const oy = 0.25 * Math.sin(a * 1.2);
+      const d = Math.sqrt((u - ox) * (u - ox) + (v - oy) * (v - oy));
+      z = 0.4 + 2.8 * Math.pow(clamp01(1 - d), 2.2) + 0.55 * wig;
+      const sw = CONFIG.swirl * (1 - clamp01(d));
+      [x, y] = rot2(u, v, sw * 1.6 + a);
+    }
+
+    const persp = Math.max(0, CONFIG.perspective) * 0.85;
+    const k = 1 / (1 + z * persp);
+
+    const sx = x * k;
+    const sy = y * k;
+
+    const depth01 = clamp01(1 - k);
+    const size = lerp(1.65, 0.55, depth01);
+    const a01 = lerp(1.0, 0.18, depth01);
+
+    const fieldTwist = (CONFIG.swirl * 0.55) * (1 - rr) * Math.sin(t * 0.6);
+    const angle = CONFIG.fieldRotation + fieldTwist + (wig * 0.9);
+
+    return { nx: sx, ny: sy, scale: size, alpha: a01, angle: angle, rr: rr };
+  }
+
+  // ======================================================
+  //  UI
+  // ======================================================
+  function setUIVisible(visible) {
+    CONFIG.uiVisible = !!visible;
+    const ui = document.getElementById("ui");
+    const showBtn = document.getElementById("showUI");
+    if (!ui || !showBtn) return;
+    if (CONFIG.uiVisible) {
+      ui.classList.remove("hidden");
+      showBtn.style.display = "none";
+    } else {
+      ui.classList.add("hidden");
+      showBtn.style.display = "block";
+    }
+  }
+
+  function setupUI(restartFn, clearFn) {
+    const presetEl = document.getElementById("preset");
+    const renderEl = document.getElementById("renderMode");
+    const densityEl = document.getElementById("density");
+    const sizeEl = document.getElementById("size");
+    const thickEl = document.getElementById("thick");
+    const copiesEl = document.getElementById("copies");
+    const tiltEl = document.getElementById("tilt");
+    const warpEl = document.getElementById("warp");
+    const perspEl = document.getElementById("persp");
+    const swirlEl = document.getElementById("swirl");
+    const trailEl = document.getElementById("trail");
+    const grainEl = document.getElementById("grain");
+    const textEl = document.getElementById("text");
+    const resetBtn = document.getElementById("reset");
+    const clearBtn = document.getElementById("clear");
+    const hideBtn = document.getElementById("hideBtn");
+    const showBtn = document.getElementById("showUI");
+
+    presetEl.innerHTML = "";
+    for (const p of CONFIG.presets) {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      presetEl.appendChild(opt);
+    }
+
+    function syncToInputs() {
+      presetEl.value = CONFIG.preset;
+      renderEl.value = CONFIG.renderMode;
+      densityEl.value = String(CONFIG.density);
+      sizeEl.value = String(CONFIG.glyphSize);
+      thickEl.value = String(CONFIG.thickness);
+      copiesEl.value = String(CONFIG.copiesPerCell);
+      tiltEl.value = String(CONFIG.fieldRotation);
+      warpEl.value = String(CONFIG.warp);
+      perspEl.value = String(CONFIG.perspective);
+      swirlEl.value = String(CONFIG.swirl);
+      trailEl.value = String(CONFIG.trailsAlpha);
+      grainEl.value = String(CONFIG.grain);
+      textEl.value = [CONFIG.glyphs, ...(CONFIG.overlayLines || [])].join("\n");
+    }
+
+    function parseTextArea() {
+      const parsed = parseTextBlock(textEl.value);
+      CONFIG.glyphs = parsed.glyphs;
+      CONFIG.overlayLines = parsed.overlays;
+    }
+
+    syncToInputs();
+    parseTextArea();
+    setUIVisible(CONFIG.uiVisible);
+
+    presetEl.addEventListener("change", () => { CONFIG.preset = presetEl.value; restartFn(); });
+    renderEl.addEventListener("change", () => { CONFIG.renderMode = renderEl.value; });
+
+    densityEl.addEventListener("input", () => { CONFIG.density = parseInt(densityEl.value, 10); });
+    sizeEl.addEventListener("input", () => { CONFIG.glyphSize = parseFloat(sizeEl.value); });
+    thickEl.addEventListener("input", () => { CONFIG.thickness = parseFloat(thickEl.value); });
+    copiesEl.addEventListener("input", () => { CONFIG.copiesPerCell = parseInt(copiesEl.value, 10); });
+    tiltEl.addEventListener("input", () => { CONFIG.fieldRotation = parseFloat(tiltEl.value); });
+    warpEl.addEventListener("input", () => { CONFIG.warp = parseFloat(warpEl.value); });
+    perspEl.addEventListener("input", () => { CONFIG.perspective = parseFloat(perspEl.value); });
+    swirlEl.addEventListener("input", () => { CONFIG.swirl = parseFloat(swirlEl.value); });
+    trailEl.addEventListener("input", () => { CONFIG.trailsAlpha = parseInt(trailEl.value, 10); });
+    grainEl.addEventListener("input", () => { CONFIG.grain = parseFloat(grainEl.value); });
+
+    textEl.addEventListener("input", () => { parseTextArea(); });
+
+    resetBtn.addEventListener("click", () => restartFn());
+    clearBtn.addEventListener("click", () => clearFn());
+
+    hideBtn.addEventListener("click", () => setUIVisible(false));
+    showBtn.addEventListener("click", () => setUIVisible(true));
+
+    return {
+      syncPreset() { presetEl.value = CONFIG.preset; },
+      setFPS(v) {
+        const fpsEl = document.getElementById("fps");
+        if (fpsEl) fpsEl.textContent = v.toFixed(0) + " fps";
+      }
+    };
+  }
+
+  // ======================================================
+  //  Glyph selection
+  // ======================================================
+  function pickGlyph(index) {
+    const s = (CONFIG.glyphs && String(CONFIG.glyphs).length) ? String(CONFIG.glyphs) : "/";
+    const i = ((index % s.length) + s.length) % s.length;
+    return s.charAt(i);
+  }
+
+  // ======================================================
+  //  Script loader
+  // ======================================================
+  function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = url;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("Failed to load: " + url));
+      document.head.appendChild(s);
+    });
+  }
+
+  // ======================================================
+  //  Keybinds
+  // ======================================================
+  function attachKeybinds(syncPresetFn, onScreenshot, onClear) {
+    window.addEventListener("keydown", (e) => {
+      if (e.key && e.key.toLowerCase() === "h") {
+        setUIVisible(!CONFIG.uiVisible);
+        return;
+      }
+      if (e.code === "Space") {
+        Time.togglePause();
+        e.preventDefault();
+        return;
+      }
+      if (e.key && e.key.toLowerCase() === "s") {
+        onScreenshot();
+        return;
+      }
+      if (e.key && e.key.toLowerCase() === "c") {
+        onClear();
+        return;
+      }
+      const k = parseInt(e.key, 10);
+      if (k >= 1 && k <= CONFIG.presets.length) {
+        CONFIG.preset = CONFIG.presets[k - 1];
+        syncPresetFn();
+        Time.reset();
+        onClear();
+      }
+    });
+  }
+
+  // ======================================================
+  //  Boot
+  // ======================================================
+  (async function boot() {
+    try {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js");
+    } catch (e1) {
+      try {
+        await loadScript("https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js");
+      } catch (e2) {
+        // ignore
+      }
+    }
+
+    if (window.p5) {
+      startP5();
+    } else {
+      banner("p5.js could not load here. Running a Canvas2D fallback.");
+      startFallback();
+    }
+  })();
+
+  // ======================================================
+  //  p5 renderer (optimized)
+  // ======================================================
+  function startP5() {
+    let screenshotFlash = 0;
+
+    // Cached overlays
+    let vignetteG = null;
+    let grainTile = null;
+    let grainTileStamp = 0;
+
+    // Glyph cache (fast glyph mode)
+    const glyphCache = new Map();
+    let glyphCacheSig = "";
+
+    function clearGlyphCacheIfNeeded() {
+      const sig = [CONFIG.glyphFont, CONFIG.glyphWeight, CONFIG.thickness, CONFIG.sizeQuantStep].join("|");
+      if (sig !== glyphCacheSig) {
+        glyphCacheSig = sig;
+        glyphCache.clear();
+      }
+    }
+
+    function getGlyphSprite(p, ch, qSize) {
+      clearGlyphCacheIfNeeded();
+      const key = ch + "|" + qSize + "|" + glyphCacheSig;
+      const found = glyphCache.get(key);
+      if (found) return found;
+
+      // Large-enough square to avoid clipping when rotated
+      const dim = Math.ceil(qSize * 2.2);
+      const g = p.createGraphics(dim, dim);
+      g.pixelDensity(1);
+      g.clear();
+
+      g.textAlign(g.CENTER, g.CENTER);
+      g.textFont(CONFIG.glyphFont);
+      g.textStyle(g.BOLD);
+      g.textSize(qSize);
+      g.noStroke();
+      g.fill(255);
+
+      // "Thickness" baked into the sprite via small offsets (orientation-agnostic)
+      const passes = Math.max(1, Math.round(CONFIG.thickness));
+      const spread = Math.min(2.6, 0.18 * passes);
+      for (let i = 0; i < passes; i++) {
+        const a = (i / passes) * TAU;
+        const dx = Math.cos(a) * spread;
+        const dy = Math.sin(a) * spread;
+        g.text(ch, dim / 2 + dx, dim / 2 + dy);
+      }
+
+      glyphCache.set(key, g);
+      return g;
+    }
+
+    function rebuildVignette(p) {
+      const v = CONFIG.vignette;
+      if (v <= 0) {
+        vignetteG = null;
+        return;
+      }
+      const w = p.width, h = p.height;
+      const g = p.createGraphics(w, h);
+      g.pixelDensity(1);
+      const ctx = g.drawingContext;
+      const cx = w / 2, cy = h / 2;
+      const r0 = Math.min(w, h) * 0.12;
+      const r1 = Math.max(w, h) * 0.72;
+      const grad = ctx.createRadialGradient(cx, cy, r0, cx, cy, r1);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, "rgba(0,0,0," + (0.78 * v) + ")");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      vignetteG = g;
+    }
+
+    function rebuildGrainTile(p) {
+      const s = Math.max(64, CONFIG.grainTileSize | 0);
+      const g = p.createGraphics(s, s);
+      g.pixelDensity(1);
+      const ctx = g.drawingContext;
+      const img = ctx.createImageData(s, s);
+      const data = img.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const v = (Math.random() * 255) | 0;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
+        data[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      grainTile = g;
+      grainTileStamp = performance.now();
+    }
+
+    function drawGrainTiled(p) {
+      const g = CONFIG.grain;
+      if (g <= 0 || !grainTile) return;
+
+      // Update tile occasionally for motion but keep it cheap
+      const age = performance.now() - grainTileStamp;
+      if (age > 160) rebuildGrainTile(p);
+
+      p.push();
+      p.blendMode(p.OVERLAY);
+      p.tint(255, 255 * Math.min(1, g));
+      p.imageMode(p.CORNER);
+
+      const s = grainTile.width;
+      for (let y = 0; y < p.height; y += s) {
+        for (let x = 0; x < p.width; x += s) {
+          p.image(grainTile, x, y);
+        }
+      }
+      p.pop();
+    }
+
+    function drawOverlayText(p) {
+      const lines = CONFIG.overlayLines || [];
+      if (!lines.length) return;
+      p.push();
+      p.textFont("system-ui");
+      p.textStyle(p.BOLD);
+      p.textSize(CONFIG.overlaySize);
+      p.textAlign(p.LEFT, p.TOP);
+      p.noStroke();
+      p.fill(255, CONFIG.overlayAlpha);
+      let y = 14;
+      for (const line of lines) {
+        p.text(line, 14, y);
+        y += CONFIG.overlaySize * 1.05;
+      }
+      p.pop();
+    }
+
+    function drawLineMark(p, cx, cy, lenPx, angle, thick, alpha) {
+      const passes = Math.max(1, Math.round(thick));
+      const spread = Math.min(2.2, 0.22 * thick);
+      p.push();
+      p.translate(cx, cy);
+      p.rotate(angle);
+      p.stroke(255, alpha);
+      p.strokeCap(p.SQUARE);
+
+      for (let i = 0; i < passes; i++) {
+        const k = (passes === 1) ? 0 : (i / (passes - 1)) * 2 - 1;
+        p.strokeWeight(Math.max(1, thick * 0.55));
+        p.line(-lenPx * 0.5, k * spread, lenPx * 0.5, k * spread);
+      }
+      p.pop();
+    }
+
+    function drawGlyphMark(p, cx, cy, sizePx, angle, alpha, glyph) {
+      const q = quantizeSize(sizePx);
+      const sprite = getGlyphSprite(p, glyph, q);
+      const dim = sprite.width;
+      const scale = sizePx / q;
+
+      p.push();
+      p.translate(cx, cy);
+      p.rotate(angle);
+      p.imageMode(p.CENTER);
+      p.tint(255, alpha);
+      p.image(sprite, 0, 0, dim * scale, dim * scale);
+      p.pop();
+    }
+
+    let lastClearRequested = false;
+
+    const ui = setupUI(
+      () => { Time.reset(); lastClearRequested = true; },
+      () => { lastClearRequested = true; }
+    );
+
+    attachKeybinds(
+      () => ui.syncPreset(),
+      () => { screenshotFlash = 1.0; },
+      () => { lastClearRequested = true; }
+    );
+
+    const sketch = (p) => {
+      p.setup = () => {
+        // Some environments may not support this property; safe to ignore.
+        try { p.disableFriendlyErrors = true; } catch (e) {}
+
+        p.createCanvas(window.innerWidth, window.innerHeight);
+        p.pixelDensity(CONFIG.pixelDensity);
+        p.background(0);
+        rebuildVignette(p);
+        rebuildGrainTile(p);
+      };
+
+      p.windowResized = () => {
+        p.resizeCanvas(window.innerWidth, window.innerHeight);
+        p.background(0);
+        rebuildVignette(p);
+      };
+
+      p.draw = () => {
+        const t = Time.nowSeconds();
+
+        ui.setFPS(p.frameRate());
+
+        if (lastClearRequested) {
+          p.background(0);
+          lastClearRequested = false;
+        }
+
+        if (CONFIG.trailsAlpha <= 0) {
+          p.background(0);
+        } else {
+          p.noStroke();
+          p.fill(0, CONFIG.trailsAlpha);
+          p.rect(0, 0, p.width, p.height);
+        }
+
+        const w = p.width;
+        const h = p.height;
+        const minSide = Math.min(w, h);
+        const aspect = w / h;
+
+        const cols = Math.floor(CONFIG.density * aspect);
+        const rows = Math.floor(CONFIG.density);
+        const countX = Math.max(6, cols);
+        const countY = Math.max(6, rows);
+
+        const zoom = 1.0 + 0.05 * Math.sin(t * 0.6);
+
+        const copyCount = Math.max(1, Math.min(4, CONFIG.copiesPerCell | 0));
+        const spread = clamp01(CONFIG.copySpread);
+
+        if (CONFIG.renderMode === "line") {
+          p.noFill();
+        } else {
+          p.noStroke();
+        }
+
+        for (let j = 0; j < countY; j++) {
+          const v = (j / (countY - 1)) * 2 - 1;
+          for (let i = 0; i < countX; i++) {
+            const u0 = (i / (countX - 1)) * 2 - 1;
+            const u = u0 * aspect;
+
+            const cell = mapCell(u * zoom, v * zoom, t * CONFIG.speed);
+
+            const px = w * 0.5 + cell.nx * (minSide * 0.55);
+            const py = h * 0.5 + cell.ny * (minSide * 0.55);
+
+            // Cheaper noise for per-cell jitter
+            const nn = vnoise2(u0 * 3.4 + t * 0.12, v * 3.4 - t * 0.10);
+            const pulse = 0.78 + 0.32 * Math.sin(t * 1.2 + nn * TAU);
+
+            const size = CONFIG.glyphSize * cell.scale * pulse;
+            const thick = CONFIG.thickness * cell.scale;
+
+            const edge = clamp01(1 - Math.pow(cell.rr, 1.35));
+            const alpha = clamp01(cell.alpha) * edge;
+            const a = lerp(CONFIG.minAlpha, CONFIG.maxAlpha, alpha);
+
+            const baseAng = cell.angle + (nn - 0.5) * 0.30 + CONFIG.glyphRotationOffset;
+            const ax = Math.cos(baseAng);
+            const ay = Math.sin(baseAng);
+            const dist = size * 0.75 * spread;
+
+            for (let c = 0; c < copyCount; c++) {
+              const kk = (copyCount === 1) ? 0 : (c / (copyCount - 1)) * 2 - 1;
+              const gx = px + ax * kk * dist;
+              const gy = py + ay * kk * dist;
+
+              if (CONFIG.renderMode === "line") {
+                drawLineMark(p, gx, gy, size, baseAng, thick, a);
+              } else {
+                const glyph = pickGlyph(i + j * 997 + c * 31);
+                drawGlyphMark(p, gx, gy, size, baseAng, a, glyph);
+              }
+            }
+          }
+        }
+
+        if (vignetteG) {
+          p.push();
+          p.blendMode(p.BLEND);
+          p.imageMode(p.CORNER);
+          p.image(vignetteG, 0, 0);
+          p.pop();
+        }
+
+        drawGrainTiled(p);
+        drawOverlayText(p);
+
+        if (screenshotFlash > 0) {
+          p.push();
+          p.noStroke();
+          p.fill(255, 30 * screenshotFlash);
+          p.rect(0, 0, w, h);
+          p.pop();
+          screenshotFlash *= 0.85;
+          if (screenshotFlash < 0.05) {
+            screenshotFlash = 0;
+            try { p.saveCanvas("slash-fields", "png"); } catch (e) {}
+          }
+        }
+      };
+    };
+
+    new window.p5(sketch);
+  }
+
+  // ======================================================
+  //  Canvas2D fallback (glyph + line)
+  // ======================================================
+  function startFallback() {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    let vignetteCanvas = null;
+    let grainTile = null;
+    let grainStamp = 0;
+
+    const glyphCache = new Map();
+    let glyphCacheSig = "";
+
+    function clearGlyphCacheIfNeeded() {
+      const sig = [CONFIG.glyphFont, CONFIG.glyphWeight, CONFIG.thickness, CONFIG.sizeQuantStep].join("|");
+      if (sig !== glyphCacheSig) {
+        glyphCacheSig = sig;
+        glyphCache.clear();
+      }
+    }
+
+    function getGlyphSprite(ch, qSize) {
+      clearGlyphCacheIfNeeded();
+      const key = ch + "|" + qSize + "|" + glyphCacheSig;
+      const found = glyphCache.get(key);
+      if (found) return found;
+
+      const dim = Math.ceil(qSize * 2.2);
+      const c = document.createElement("canvas");
+      c.width = dim;
+      c.height = dim;
+      const g = c.getContext("2d");
+      g.clearRect(0, 0, dim, dim);
+      g.fillStyle = "white";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.font = CONFIG.glyphWeight + " " + qSize + "px " + CONFIG.glyphFont;
+
+      const passes = Math.max(1, Math.round(CONFIG.thickness));
+      const spread = Math.min(2.6, 0.18 * passes);
+      for (let i = 0; i < passes; i++) {
+        const a = (i / passes) * TAU;
+        const dx = Math.cos(a) * spread;
+        const dy = Math.sin(a) * spread;
+        g.fillText(ch, dim / 2 + dx, dim / 2 + dy);
+      }
+
+      glyphCache.set(key, c);
+      return c;
+    }
+
+    function rebuildVignette() {
+      const v = CONFIG.vignette;
+      if (v <= 0) {
+        vignetteCanvas = null;
+        return;
+      }
+      const w = canvas.width, h = canvas.height;
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d");
+      const cx = w / 2, cy = h / 2;
+      const r0 = Math.min(w, h) * 0.12;
+      const r1 = Math.max(w, h) * 0.72;
+      const grad = g.createRadialGradient(cx, cy, r0, cx, cy, r1);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, "rgba(0,0,0," + (0.78 * v) + ")");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, w, h);
+      vignetteCanvas = c;
+    }
+
+    function rebuildGrainTile() {
+      const s = Math.max(64, CONFIG.grainTileSize | 0);
+      const c = document.createElement("canvas");
+      c.width = s;
+      c.height = s;
+      const g = c.getContext("2d");
+      const img = g.createImageData(s, s);
+      const data = img.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const v = (Math.random() * 255) | 0;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
+        data[i + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      grainTile = c;
+      grainStamp = performance.now();
+    }
+
+    function resize() {
+      canvas.width = Math.floor(window.innerWidth);
+      canvas.height = Math.floor(window.innerHeight);
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      rebuildVignette();
+      rebuildGrainTile();
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    let needClear = false;
+
+    const ui = setupUI(
+      () => { Time.reset(); needClear = true; },
+      () => { needClear = true; }
+    );
+
+    attachKeybinds(
+      () => ui.syncPreset(),
+      () => {},
+      () => { needClear = true; }
+    );
+
+    function drawOverlayText() {
+      const lines = CONFIG.overlayLines || [];
+      if (!lines.length) return;
+      ctx.save();
+      ctx.font = "900 " + CONFIG.overlaySize + "px system-ui";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "rgba(255,255,255," + (CONFIG.overlayAlpha / 255) + ")";
+      let y = 14;
+      for (const line of lines) {
+        ctx.fillText(line, 14, y);
+        y += CONFIG.overlaySize * 1.05;
+      }
+      ctx.restore();
+    }
+
+    function drawGrain() {
+      const g = CONFIG.grain;
+      if (g <= 0 || !grainTile) return;
+      const age = performance.now() - grainStamp;
+      if (age > 160) rebuildGrainTile();
+
+      ctx.save();
+      ctx.globalCompositeOperation = "overlay";
+      ctx.globalAlpha = Math.min(1, g);
+      const s = grainTile.width;
+      for (let y = 0; y < canvas.height; y += s) {
+        for (let x = 0; x < canvas.width; x += s) {
+          ctx.drawImage(grainTile, x, y);
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawGlyph(cx, cy, sizePx, angle, alpha, glyph) {
+      const q = quantizeSize(sizePx);
+      const sprite = getGlyphSprite(glyph, q);
+      const dim = sprite.width;
+      const scale = sizePx / q;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.globalAlpha = alpha / 255;
+      ctx.drawImage(sprite, -dim * scale / 2, -dim * scale / 2, dim * scale, dim * scale);
+      ctx.restore();
+    }
+
+    function drawLine(cx, cy, lenPx, angle, thick, alpha) {
+      const passes = Math.max(1, Math.round(thick));
+      const spread = Math.min(2.2, 0.22 * thick);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.strokeStyle = "rgba(255,255,255," + (alpha / 255) + ")";
+      ctx.lineCap = "square";
+
+      for (let i = 0; i < passes; i++) {
+        const k = (passes === 1) ? 0 : (i / (passes - 1)) * 2 - 1;
+        ctx.lineWidth = Math.max(1, thick * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(-lenPx * 0.5, k * spread);
+        ctx.lineTo(lenPx * 0.5, k * spread);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    let lastT = performance.now();
+    let fpsEMA = 60;
+
+    function frame() {
+      const now = performance.now();
+      const dt = Math.max(1, now - lastT);
+      lastT = now;
+      const inst = 1000 / dt;
+      fpsEMA = fpsEMA * 0.9 + inst * 0.1;
+      ui.setFPS(fpsEMA);
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const minSide = Math.min(w, h);
+      const aspect = w / h;
+
+      const t = Time.nowSeconds();
+
+      if (needClear) {
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, w, h);
+        needClear = false;
+      }
+
+      if (CONFIG.trailsAlpha <= 0) {
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, w, h);
+      } else {
+        ctx.fillStyle = "rgba(0,0,0," + (CONFIG.trailsAlpha / 255) + ")";
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      const cols = Math.floor(CONFIG.density * aspect);
+      const rows = Math.floor(CONFIG.density);
+      const countX = Math.max(6, cols);
+      const countY = Math.max(6, rows);
+
+      const zoom = 1.0 + 0.05 * Math.sin(t * 0.6);
+      const copyCount = Math.max(1, Math.min(4, CONFIG.copiesPerCell | 0));
+      const spread = clamp01(CONFIG.copySpread);
+
+      for (let j = 0; j < countY; j++) {
+        const vv = (j / (countY - 1)) * 2 - 1;
+        for (let i = 0; i < countX; i++) {
+          const u0 = (i / (countX - 1)) * 2 - 1;
+          const uu = u0 * aspect;
+
+          const cell = mapCell(uu * zoom, vv * zoom, t * CONFIG.speed);
+
+          const px = w * 0.5 + cell.nx * (minSide * 0.55);
+          const py = h * 0.5 + cell.ny * (minSide * 0.55);
+
+          const nn = vnoise2(u0 * 3.4 + t * 0.12, vv * 3.4 - t * 0.10);
+          const pulse = 0.78 + 0.32 * Math.sin(t * 1.2 + nn * TAU);
+
+          const size = CONFIG.glyphSize * cell.scale * pulse;
+          const thick = CONFIG.thickness * cell.scale;
+
+          const edge = clamp01(1 - Math.pow(cell.rr, 1.35));
+          const alpha = clamp01(cell.alpha) * edge;
+          const a = lerp(CONFIG.minAlpha, CONFIG.maxAlpha, alpha);
+
+          const baseAng = cell.angle + (nn - 0.5) * 0.30 + CONFIG.glyphRotationOffset;
+          const ax = Math.cos(baseAng);
+          const ay = Math.sin(baseAng);
+          const dist = size * 0.75 * spread;
+
+          for (let c = 0; c < copyCount; c++) {
+            const kk = (copyCount === 1) ? 0 : (c / (copyCount - 1)) * 2 - 1;
+            const gx = px + ax * kk * dist;
+            const gy = py + ay * kk * dist;
+
+            if (CONFIG.renderMode === "line") {
+              drawLine(gx, gy, size, baseAng, thick, a);
+            } else {
+              const glyph = pickGlyph(i + j * 997 + c * 31);
+              drawGlyph(gx, gy, size, baseAng, a, glyph);
+            }
+          }
+        }
+      }
+
+      if (vignetteCanvas) ctx.drawImage(vignetteCanvas, 0, 0);
+      drawGrain();
+      drawOverlayText();
+
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  }
+  </script>
+</body>
+</html>
