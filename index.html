@@ -24,6 +24,7 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
     }
     #ui.hidden { display: none; }
+
     #ui h3 {
       margin: 0 0 8px 0;
       font-size: 12px;
@@ -129,7 +130,6 @@
       display: none;
     }
 
-    code { opacity: 0.95; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
@@ -153,8 +153,12 @@
       <label for="renderMode">Render</label>
       <select id="renderMode">
         <option value="glyph">Glyphs (fast)</option>
-        <option value="line">Lines</option>
-      </select>
+        <option value="line">Lines</option>      </select>
+    </div>
+
+    <div class="row">
+      <label for="font">Font</label>
+      <select id="font"></select>
     </div>
 
     <div class="row"><label for="density">Density</label><input id="density" type="range" min="8" max="48" step="1" /></div>
@@ -207,7 +211,7 @@
     renderScale: 1.0,           // 0.45..1.0 (lower = faster)
 
     // Glyphs
-    glyphs: "|",               // repeating pattern (line 1 in textarea overrides)
+    glyphs: "/",               // repeating pattern (line 1 in textarea overrides)
     glyphFont: "ui-monospace", // CSS font name
     glyphWeight: 800,
     glyphRotationOffset: 0.0,   // radians
@@ -244,7 +248,7 @@
     overlaySize: 26,
     overlayAlpha: 120,
 
-    // Entrance/exit animation (smooth: opacity + distance, no density popping)
+    // Entrance/exit animation (smooth: opacity + distance)
     transitionDuration: 1.1,        // seconds
     transitionEaseOutPower: 3.0,    // IN  : ease-out (fast -> slow)
     transitionEaseInPower: 2.4,     // OUT : ease-in  (slow -> fast)
@@ -262,8 +266,19 @@
     fbmOctaves: 3,
 
     // Presets
-    presets: ["WavePlane", "Tunnel", "Sphere", "Vortex", "Ripple", "Orbit"]
-  };
+    presets: ["WavePlane", "Tunnel", "Sphere", "Vortex", "Ripple", "Orbit"],
+
+    // Font menu (uses system-installed fonts if present)
+    fontOptions: [
+      "ui-monospace",
+      "system-ui",
+      "serif",
+      "sans-serif",
+      "Martina-Plantijn",
+      "Phonic"
+    ]
+  }
+  window.CONFIG = CONFIG;;
   window.CONFIG = CONFIG;
 
   // ======================================================
@@ -272,8 +287,16 @@
   function parseTextBlock(text) {
     const safe = String(text ?? "");
     const lines = safe.replace(/\r/g, "").split("\n");
-    const glyphLine = (lines[0] ?? "/").trim();
-    const glyphs = glyphLine.length ? glyphLine : "/";
+
+    // IMPORTANT: do NOT trim line 1 — spaces are valid glyphs.
+    // This lets patterns like "A " (A + trailing space) work.
+    const glyphLineRaw = (lines[0] ?? "/");
+
+    // If the user truly leaves line 1 empty, fall back to "/".
+    // (But if they type spaces, we keep them as glyphs on purpose.)
+    const glyphs = (glyphLineRaw.length > 0) ? glyphLineRaw : "/";
+
+    // Overlay lines: trim + drop empties
     const overlays = lines.slice(1).map(s => s.trim()).filter(Boolean);
     return { glyphs, overlays, lines };
   }
@@ -294,19 +317,30 @@
       console.assert(typeof CONFIG.transitionDuration === "number", "transitionDuration must exist");
 
       {
-        const a = parseTextBlock("/\nHELLO\nWORLD");
+        const a = parseTextBlock("/\\nHELLO\\nWORLD");
         console.assert(a.glyphs === "/", "parseTextBlock glyphs");
         console.assert(a.overlays.length === 2, "parseTextBlock overlays");
       }
       {
-        const b = parseTextBlock("\r\n   \r\nX");
-        console.assert(b.glyphs === "/", "blank glyph line defaults to /");
+        const b = parseTextBlock("\\r\\n   \\r\\nX");
+        console.assert(b.glyphs === "   ", "spaces-only glyph pattern should be preserved");
         console.assert(b.overlays[0] === "X", "CRLF handled");
       }
       {
-        const c = parseTextBlock("////\n\nA\n\nB\n");
+        const c = parseTextBlock("////\\n\\nA\\n\\nB\\n");
         console.assert(c.glyphs === "////", "should keep pattern");
         console.assert(c.overlays.length === 2, "should ignore empty overlay lines");
+      }
+      {
+        const d = parseTextBlock("A \\nTitle");
+        console.assert(d.glyphs.length === 2, "spaces in glyph pattern should be preserved");
+        console.assert(d.glyphs.charAt(1) === " ", "trailing space should be a valid glyph");
+        console.assert(d.overlays[0] === "Title", "overlay parsing still works");
+      }
+      {
+        const e = parseTextBlock("\\nX");
+        console.assert(e.glyphs === "/", "empty first line defaults to /");
+        console.assert(e.overlays[0] === "X", "overlay parsing still works");
       }
       {
         const old = CONFIG.sizeQuantStep;
@@ -332,7 +366,7 @@
     return [x * c - y * s, x * s + y * c];
   };
 
-  // Easing helpers for transitions
+  // Transition easing helpers
   function easeInPow(t, p) {
     const tt = clamp01(t);
     return Math.pow(tt, Math.max(1e-3, p));
@@ -416,11 +450,10 @@
     t0: 0,
     active: false,
     hidden: false,
-    direction: "in",           // "in" | "out"
+    direction: "in",
     justBecameHidden: false,
 
     in(now, clearFn) {
-      // Start BLANK, then ease-out in.
       this.hidden = false;
       this.justBecameHidden = false;
       this.direction = "in";
@@ -433,7 +466,6 @@
     },
 
     out(now) {
-      // Ease-in out to BLANK.
       this.direction = "out";
       this.justBecameHidden = false;
       this.from = this.value;
@@ -448,10 +480,6 @@
 
       const dur = Math.max(0.05, CONFIG.transitionDuration);
       const u = clamp01((now - this.t0) / dur);
-
-      // Different easing per direction:
-      //  - IN  : ease-out (fast -> slow)
-      //  - OUT : ease-in  (slow -> fast)
       const e = (this.direction === "in")
         ? easeOutPow(u, CONFIG.transitionEaseOutPower)
         : easeInPow(u, CONFIG.transitionEaseInPower);
@@ -520,9 +548,9 @@
       z = 0.35 + 2.2 * (1 - rr) + 0.75 * Math.sin(t * 0.8 + rr * 6 + wig);
 
     } else if (preset === "Ripple") {
-      const w = Math.sin(rr * 10 - t * 1.35 * CONFIG.speed);
-      z = 0.55 + 2.2 * (1 - rr) + 0.95 * w * CONFIG.warp;
-      const a = 0.7 * w * CONFIG.swirl;
+      const wv = Math.sin(rr * 10 - t * 1.35 * CONFIG.speed);
+      z = 0.55 + 2.2 * (1 - rr) + 0.95 * wv * CONFIG.warp;
+      const a = 0.7 * wv * CONFIG.swirl;
       [x, y] = rot2(x, y, a);
 
     } else if (preset === "WavePlane") {
@@ -604,6 +632,7 @@
     const swirlEl = requireEl("swirl");
     const trailEl = requireEl("trail");
     const grainEl = requireEl("grain");
+    const fontEl = requireEl("font");
     const vignetteEl = requireEl("vignette");
     const textEl = requireEl("text");
     const inBtn = requireEl("btnIn");
@@ -619,6 +648,26 @@
       opt.value = p;
       opt.textContent = p;
       presetEl.appendChild(opt);
+    }
+
+    // Populate font menu
+    fontEl.innerHTML = "";
+    const seenFonts = new Set();
+    for (const f of (CONFIG.fontOptions || [])) {
+      const name = String(f);
+      if (seenFonts.has(name)) continue;
+      seenFonts.add(name);
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      fontEl.appendChild(opt);
+    }
+    // Ensure current font exists as an option
+    if (CONFIG.glyphFont && !seenFonts.has(CONFIG.glyphFont)) {
+      const opt = document.createElement("option");
+      opt.value = CONFIG.glyphFont;
+      opt.textContent = CONFIG.glyphFont;
+      fontEl.insertBefore(opt, fontEl.firstChild);
     }
 
     function syncToInputs() {
@@ -637,6 +686,7 @@
       swirlEl.value = String(CONFIG.swirl);
       trailEl.value = String(CONFIG.trailsAlpha);
       grainEl.value = String(CONFIG.grain);
+      fontEl.value = String(CONFIG.glyphFont);
       vignetteEl.value = String(CONFIG.vignette);
       textEl.value = [CONFIG.glyphs, ...(CONFIG.overlayLines || [])].join("\n");
     }
@@ -670,6 +720,11 @@
     swirlEl.addEventListener("input", () => { CONFIG.swirl = parseFloat(swirlEl.value); });
     trailEl.addEventListener("input", () => { CONFIG.trailsAlpha = parseInt(trailEl.value, 10); });
     grainEl.addEventListener("input", () => { CONFIG.grain = parseFloat(grainEl.value); });
+    fontEl.addEventListener("change", () => {
+      CONFIG.glyphFont = fontEl.value;
+      // Clear trails so the new font is immediately visible
+      clearFn();
+    });
     vignetteEl.addEventListener("input", () => { CONFIG.vignette = parseFloat(vignetteEl.value); resizeFn(); });
 
     textEl.addEventListener("input", () => { parseTextArea(); });
@@ -782,10 +837,10 @@
   (async function boot() {
     try {
       await loadScript("https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js");
-    } catch (e1) {
+    } catch (_) {
       try {
         await loadScript("https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js");
-      } catch (e2) {
+      } catch (_) {
         // ignore
       }
     }
@@ -1008,12 +1063,9 @@
         lastClearRequested = true;
       };
 
-      // Clear helper used by IN
       const hardClear = (alsoMain) => {
         lastClearRequested = true;
-        if (alsoMain) {
-          p.background(0);
-        }
+        if (alsoMain) p.background(0);
       };
 
       const doIn = () => Transition.in(Time.nowSeconds(), (alsoMain) => hardClear(alsoMain));
@@ -1036,13 +1088,22 @@
       );
 
       p.setup = () => {
-        try { p.disableFriendlyErrors = true; } catch (e) {}
+        try { p.disableFriendlyErrors = true; } catch (_) {}
         p.createCanvas(window.innerWidth, window.innerHeight);
         p.pixelDensity(CONFIG.pixelDensity);
         ensureBuffer(p);
         rebuildVignette(p);
         rebuildGrainTile(p);
         p.background(0);
+
+        // Default textarea content
+        const tEl = document.getElementById("text");
+        if (tEl && !tEl.value) {
+          tEl.value = "/ \\nSlash Fields";
+          const parsed = parseTextBlock(tEl.value);
+          CONFIG.glyphs = parsed.glyphs;
+          CONFIG.overlayLines = parsed.overlays;
+        }
       };
 
       p.windowResized = () => {
@@ -1066,14 +1127,12 @@
         const posMix = lerp(CONFIG.transitionPosMin, 1.0, vis);
         const sizeMix = lerp(CONFIG.transitionSizeMin, 1.0, vis);
 
-        // If we JUST finished fading out, hard-clear and stop.
         if (Transition.justBecameHidden) {
           if (pg) pg.background(0);
           p.background(0);
           return;
         }
 
-        // If fully hidden, keep it truly blank (no grain, no vignette, no overlay)
         if (Transition.hidden) {
           if (lastClearRequested) {
             if (pg) pg.background(0);
@@ -1083,13 +1142,12 @@
           return;
         }
 
-        // Clear request
         if (lastClearRequested) {
           pg.background(0);
           lastClearRequested = false;
         }
 
-        // Trails on buffer (cheaper at lower res)
+        // Trails
         if (CONFIG.trailsAlpha <= 0) {
           pg.background(0);
         } else {
@@ -1103,7 +1161,7 @@
         const minSide = Math.min(w, h);
         const aspect = w / h;
 
-        // Entrance/exit: smooth by distance + opacity (no density popping)
+        // Constant grid size -> no popping
         const cols = Math.floor(CONFIG.density * aspect);
         const rows = Math.floor(CONFIG.density);
         const countX = Math.max(6, cols);
@@ -1131,7 +1189,7 @@
             const px0 = cx + cell.nx * (minSide * 0.55);
             const py0 = cy + cell.ny * (minSide * 0.55);
 
-            // Distance-from-letters feel: contract toward center when hidden
+            // Contract toward center when hidden (distance feel)
             const px = cx + (px0 - cx) * posMix;
             const py = cy + (py0 - cy) * posMix;
 
@@ -1165,7 +1223,7 @@
           }
         }
 
-        // Present buffer to main canvas
+        // Present buffer
         p.push();
         p.blendMode(p.BLEND);
         p.imageMode(p.CORNER);
@@ -1173,7 +1231,7 @@
         p.image(pg, 0, 0, p.width, p.height);
         p.pop();
 
-        // Overlays at full-res (also fade with transition)
+        // Overlays
         if (vignetteG && visAlpha > 0.002) {
           p.push();
           p.blendMode(p.BLEND);
@@ -1196,7 +1254,7 @@
           screenshotFlash *= 0.85;
           if (screenshotFlash < 0.05) {
             screenshotFlash = 0;
-            try { p.saveCanvas("slash-fields", "png"); } catch (e) {}
+            try { p.saveCanvas("slash-fields", "png"); } catch (_) {}
           }
         }
       };
@@ -1236,7 +1294,7 @@
       doOut
     );
 
-    attachKeybinds(() => ui.syncPreset(), () => {}, () => {}, doIn, doOut);
+    attachKeybinds(() => ui.syncPreset(), () => {}, () => { ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); }, doIn, doOut);
 
     function frame() {
       const now = performance.now();
@@ -1247,12 +1305,12 @@
 
       const t = Time.nowSeconds();
       Transition.update(t);
+
       const vis = Transition.value;
       const visAlpha = Math.pow(vis, CONFIG.transitionAlphaPower);
       const posMix = lerp(CONFIG.transitionPosMin, 1.0, vis);
       const sizeMix = lerp(CONFIG.transitionSizeMin, 1.0, vis);
 
-      // Blank when hidden
       if (Transition.hidden) {
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1268,15 +1326,13 @@
       const minSide = Math.min(w, h);
       const aspect = w / h;
 
-      // Transition is handled via opacity + distance now (no density popping)
-
-
-      const safeDensity = Math.min(CONFIG.density, 22);
-
-      const cols = Math.floor(safeDensity * aspect);
-      const rows = Math.floor(safeDensity);
+      const cols = Math.floor(Math.min(CONFIG.density, 22) * aspect);
+      const rows = Math.floor(Math.min(CONFIG.density, 22));
       const countX = Math.max(6, cols);
       const countY = Math.max(6, rows);
+
+      const cx = w * 0.5;
+      const cy = h * 0.5;
 
       ctx.strokeStyle = `rgba(255,255,255,${0.85 * visAlpha})`;
       ctx.lineWidth = 1;
@@ -1287,10 +1343,15 @@
           const u0 = (i / (countX - 1)) * 2 - 1;
           const u = u0 * aspect;
           const cell = mapCell(u, v, t * CONFIG.speed);
-          const px = w * 0.5 + cell.nx * (minSide * 0.55);
-          const py = h * 0.5 + cell.ny * (minSide * 0.55);
+
+          const px0 = cx + cell.nx * (minSide * 0.55);
+          const py0 = cy + cell.ny * (minSide * 0.55);
+          const px = cx + (px0 - cx) * posMix;
+          const py = cy + (py0 - cy) * posMix;
+
           const ang = cell.angle;
-          const len = (CONFIG.glyphSize * cell.scale) * sizeMul;
+          const len = (CONFIG.glyphSize * cell.scale) * sizeMix;
+
           ctx.save();
           ctx.translate(px, py);
           ctx.rotate(ang);
