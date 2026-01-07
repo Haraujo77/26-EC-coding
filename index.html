@@ -150,10 +150,12 @@
     </div>
 
     <div class="row">
-      <label for="renderMode">Render</label>
-      <select id="renderMode">
-        <option value="glyph">Glyphs (fast)</option>
-        <option value="line">Lines</option>      </select>
+      <label for="mode">Mode</label>
+      <select id="mode">
+        <option value="glyph">Glyphs (chars)</option>
+        <option value="word">Words</option>
+        <option value="line">Lines</option>
+      </select>
     </div>
 
     <div class="row">
@@ -162,21 +164,27 @@
     </div>
 
     <div class="row"><label for="density">Density</label><input id="density" type="range" min="8" max="48" step="1" /></div>
-    <div class="row"><label for="scale">Render scale</label><input id="scale" type="range" min="0.45" max="1" step="0.01" /></div>
+    <div class="row" id="row-scale" style="display:none;"><label for="scale">Render scale</label><input id="scale" type="range" min="0.45" max="1" step="0.01" /></div>
     <div class="row"><label for="size">Size</label><input id="size" type="range" min="6" max="80" step="1" /></div>
-    <div class="row"><label for="thick">Thickness</label><input id="thick" type="range" min="0" max="10" step="0.1" /></div>
-    <div class="row"><label for="copies">Copies per cell</label><input id="copies" type="range" min="1" max="4" step="1" /></div>
+    <div class="row" id="row-thick" style="display:none;"><label for="thick">Thickness</label><input id="thick" type="range" min="0" max="10" step="0.1" /></div>
+    <div class="row" id="row-copies" style="display:none;"><label for="copies">Copies per cell</label><input id="copies" type="range" min="1" max="4" step="1" /></div>
     <div class="row"><label for="speed">Speed</label><input id="speed" type="range" min="0" max="4" step="0.01" /></div>
-    <div class="row"><label for="tilt">Field rotation</label><input id="tilt" type="range" min="-1.5" max="1.5" step="0.01" /></div>
+    
 
+    <div class="row"><label for="tilt">Field rotation</label><input id="tilt" type="range" min="-1.5" max="1.5" step="0.01" /></div>
     <div class="row"><label for="warp">Warp</label><input id="warp" type="range" min="0" max="2" step="0.01" /></div>
     <div class="row"><label for="persp">Perspective</label><input id="persp" type="range" min="0" max="2" step="0.01" /></div>
-    <div class="row"><label for="depthFade">Depth fade</label><input id="depthFade" type="range" min="0.05" max="2.5" step="0.01" /></div>
+    <div class="row" id="row-depthFade" style="display:none;"><label for="depthFade">Depth fade</label><input id="depthFade" type="range" min="0.05" max="2.5" step="0.01" /></div>
     <div class="row"><label for="swirl">Swirl</label><input id="swirl" type="range" min="0" max="2" step="0.01" /></div>
 
-    <div class="row"><label for="trail">Trails</label><input id="trail" type="range" min="0" max="255" step="1" /></div>
-    <div class="row"><label for="grain">Grain</label><input id="grain" type="range" min="0" max="1" step="0.01" /></div>
+    <div class="row" id="row-torsionA"><label for="torsionA">Torsion A</label><input id="torsionA" type="range" min="0" max="6" step="0.01" /></div>
+    <div class="row" id="row-torsionB"><label for="torsionB">Torsion B</label><input id="torsionB" type="range" min="0" max="6" step="0.01" /></div>
+    <div class="row" id="row-torsionSpeed"><label for="torsionSpeed">Torsion speed</label><input id="torsionSpeed" type="range" min="0" max="3" step="0.01" /></div>
+
+    <div class="row" id="row-trail" style="display:none;"><label for="trail">Trails</label><input id="trail" type="range" min="0" max="255" step="1" /></div>
+    <div class="row" id="row-grain" style="display:none;"><label for="grain">Grain</label><input id="grain" type="range" min="0" max="1" step="0.01" /></div>
     <div class="row"><label for="vignette">Vignette</label><input id="vignette" type="range" min="0" max="1" step="0.01" /></div>
+    <div class="row"><label for="invert">Invert direction</label><input id="invert" type="checkbox" /></div>
 
     <div class="row"><label for="text">Line 1 = pattern, rest = overlay</label><span id="fps" class="mono" style="opacity:.8;">-- fps</span></div>
     <textarea id="text" spellcheck="false"></textarea>
@@ -193,7 +201,7 @@
   </div>
 
   <div id="hint">
-    Keys: <b>1–6</b> presets · <b>Space</b> pause · <b>S</b> screenshot · <b>H</b> hide controls · <b>C</b> clear · <b>I</b> in · <b>O</b> out. (Shortcuts disabled while typing.)
+    Keys: <b>1–9</b> presets · <b>Space</b> pause · <b>S</b> screenshot · <b>H</b> hide controls · <b>C</b> clear · <b>I</b> in · <b>O</b> out. (Shortcuts disabled while typing.)
   </div>
 
   <script>
@@ -205,19 +213,22 @@
   const CONFIG = {
     // Rendering
     renderMode: "glyph",        // "glyph" | "line"
+    patternMode: "glyph",       // "glyph" (chars) | "word" (tokens)
+    mode: "glyph",              // UI convenience: "glyph" | "word" | "line"
     uiVisible: true,
 
     // Big perf lever — render into a smaller buffer, then upscale
-    renderScale: 1.0,           // 0.45..1.0 (lower = faster)
+    renderScale: 1.0,            // 0.45..1.0 (lower = faster)
 
     // Glyphs
-    glyphs: "/",               // repeating pattern (line 1 in textarea overrides)
-    glyphFont: "ui-monospace", // CSS font name
+    glyphs: "/",                // repeating pattern (line 1 in textarea overrides)
+    words: ["/"],               // tokenized pattern for word-mode
+    glyphFont: "Phonic",  // CSS font name
     glyphWeight: 800,
-    glyphRotationOffset: 0.0,   // radians
+    glyphRotationOffset: 0.0,    // radians
 
     // Core
-    preset: "WavePlane",
+    preset: "Wave Grid",
     density: 18,
     glyphSize: 26,
     thickness: 0.0,
@@ -226,18 +237,42 @@
 
     // Motion
     speed: 1.5,
-    fieldRotation: -0.55,
+    invertDirection: false,
+    fieldRotation: -0.25,
 
     // Warp
     warp: 1.0,
     perspective: 1.15,
     swirl: 0.75,
 
+    // 3D torsion controls (used by the tall cube + cylinder)
+    torsionA: 2.2,
+    torsionB: 1.6,
+    torsionSpeed: 1.0,
+
+    // Tall cube
+    prismWidth: 0.78,           // half-width in X/Z
+    prismHeight: 1.34,          // full height
+
+    // Cylinder
+    dillRadius: 0.78,
+    dillHalfLen: 1.25,
+
+    // 3D object: Football (simple + stable silhouette)
+    footballHalfLen: 1.25,
+    footballPointiness: 1.05,
+    footballTaperPow: 0.55,
+    footballSquashY: 0.80,
+    footballSquashZ: 0.80,
+    footballDepthBoost: 1.10,
+    footballYawAmp: 0.18,
+    footballPitchAmp: 0.12,
+
     // Lighting
     minAlpha: 14,
     maxAlpha: 255,
     vignette: 0.35,
-    depthFadePower: 2.5,       // 0.05..2.5 (lower = brighter deep marks)
+    depthFadePower: 2.5,         // lower = brighter deep marks
 
     // Trails / look
     trailsAlpha: 0,
@@ -249,12 +284,12 @@
     overlayAlpha: 120,
 
     // Entrance/exit animation (smooth: opacity + distance)
-    transitionDuration: 1.1,        // seconds
-    transitionEaseOutPower: 3.0,    // IN  : ease-out (fast -> slow)
-    transitionEaseInPower: 2.4,     // OUT : ease-in  (slow -> fast)
-    transitionAlphaPower: 1.0,      // extra shaping on top of easing (1 = linear)
-    transitionPosMin: 0.10,         // 0..1 : how close to center when hidden (0 = center)
-    transitionSizeMin: 0.55,        // 0..1 : size multiplier when hidden
+    transitionDuration: 1.1,
+    transitionEaseOutPower: 3.0,
+    transitionEaseInPower: 2.4,
+    transitionAlphaPower: 1.0,
+    transitionPosMin: 0.10,
+    transitionSizeMin: 0.55,
 
     // Performance
     pixelDensity: 1,
@@ -265,20 +300,62 @@
     grainTileSize: 256,
     fbmOctaves: 3,
 
-    // Presets
-    presets: ["WavePlane", "Tunnel", "Sphere", "Vortex", "Ripple", "Orbit"],
+    // Presets (sorted by similarity)
+    presets: [
+      // Planar waves / interference
+      "Wave Grid",
+      "Wave Interference",
+
+      // Sweeps / broadcast motion
+      "Diagonal Sweep",
+      "Clock Sweep",
+
+      // Focus / orbit / lens
+      "Orbit Spotlight",
+      "Spot Pulse",
+
+      // Rings / pulses
+      "Ripple Rings",
+      "Shock Rings",
+      "Shockwave",
+      "Rebound Pulse",
+
+      // Forward drive / tunnel
+      "Tunnel Drive",
+      "Punch Drive",
+      "Forward Rush",
+
+      // Spiral / twist
+      "Vortex Twist",
+      "Spiral Surge",
+      "Helix Coil",
+
+      // 3D objects
+      "Sphere Drift",
+      "Box Drift",
+      "Football Drift",
+      "Football Vertical",
+      "Torus Drift",
+      "Cylinder Spin",
+      "Twisted Tall Cube",
+      "Twisted Cylinder",
+
+      // Texture / bursts
+      "Crumple Noise",
+      "Lens Breath",
+      "Starburst"
+    ],
 
     // Font menu (uses system-installed fonts if present)
     fontOptions: [
+      "Phonic",
+      "Martina-Plantijn",
       "ui-monospace",
       "system-ui",
       "serif",
-      "sans-serif",
-      "Martina-Plantijn",
-      "Phonic"
+      "sans-serif"
     ]
-  }
-  window.CONFIG = CONFIG;;
+  };
   window.CONFIG = CONFIG;
 
   // ======================================================
@@ -288,17 +365,15 @@
     const safe = String(text ?? "");
     const lines = safe.replace(/\r/g, "").split("\n");
 
-    // IMPORTANT: do NOT trim line 1 — spaces are valid glyphs.
-    // This lets patterns like "A " (A + trailing space) work.
+    // IMPORTANT: do NOT trim line 1 — spaces are valid glyphs in glyph-mode.
     const glyphLineRaw = (lines[0] ?? "/");
-
-    // If the user truly leaves line 1 empty, fall back to "/".
-    // (But if they type spaces, we keep them as glyphs on purpose.)
     const glyphs = (glyphLineRaw.length > 0) ? glyphLineRaw : "/";
 
-    // Overlay lines: trim + drop empties
+    // Word tokens for word-mode: split on whitespace. If only whitespace, fall back to ["/"].
+    const words = glyphLineRaw.trim().length ? glyphLineRaw.trim().split(/\s+/g) : ["/"];
+
     const overlays = lines.slice(1).map(s => s.trim()).filter(Boolean);
-    return { glyphs, overlays, lines };
+    return { glyphs, words, overlays, lines };
   }
 
   function quantizeSize(px) {
@@ -315,39 +390,27 @@
       console.assert(typeof CONFIG.depthFadePower === "number", "depthFadePower must exist");
       console.assert(typeof CONFIG.perspective === "number", "perspective must exist");
       console.assert(typeof CONFIG.transitionDuration === "number", "transitionDuration must exist");
+      console.assert(typeof CONFIG.invertDirection === "boolean", "invertDirection must be boolean");
+      console.assert(["glyph","word","line"].includes(CONFIG.mode), "mode must be glyph|word|line");
+      console.assert(CONFIG.presets.includes("Twisted Tall Cube"), "3D preset Twisted Tall Cube present");
+      console.assert(CONFIG.presets.includes("Twisted Cylinder"), "3D preset Twisted Cylinder present");
 
       {
-        const a = parseTextBlock("/\\nHELLO\\nWORLD");
+        const a = parseTextBlock("/\nHELLO\nWORLD");
         console.assert(a.glyphs === "/", "parseTextBlock glyphs");
+        console.assert(a.words.length === 1 && a.words[0] === "/", "parseTextBlock words default");
         console.assert(a.overlays.length === 2, "parseTextBlock overlays");
       }
       {
-        const b = parseTextBlock("\\r\\n   \\r\\nX");
+        const b = parseTextBlock("   \r\nX");
         console.assert(b.glyphs === "   ", "spaces-only glyph pattern should be preserved");
+        console.assert(b.words.length === 1 && b.words[0] === "/", "spaces-only words should fall back");
         console.assert(b.overlays[0] === "X", "CRLF handled");
       }
       {
-        const c = parseTextBlock("////\\n\\nA\\n\\nB\\n");
-        console.assert(c.glyphs === "////", "should keep pattern");
-        console.assert(c.overlays.length === 2, "should ignore empty overlay lines");
-      }
-      {
-        const d = parseTextBlock("A \\nTitle");
-        console.assert(d.glyphs.length === 2, "spaces in glyph pattern should be preserved");
-        console.assert(d.glyphs.charAt(1) === " ", "trailing space should be a valid glyph");
-        console.assert(d.overlays[0] === "Title", "overlay parsing still works");
-      }
-      {
-        const e = parseTextBlock("\\nX");
-        console.assert(e.glyphs === "/", "empty first line defaults to /");
-        console.assert(e.overlays[0] === "X", "overlay parsing still works");
-      }
-      {
-        const old = CONFIG.sizeQuantStep;
-        CONFIG.sizeQuantStep = 4;
-        const q = quantizeSize(13);
-        console.assert(q === 12 || q === 16, "quantizeSize should snap");
-        CONFIG.sizeQuantStep = old;
+        const d = parseTextBlock("TOUCHDOWN GOAL\nTitle");
+        console.assert(d.words.length === 2, "word split should find 2 tokens");
+        console.assert(d.words[0] === "TOUCHDOWN" && d.words[1] === "GOAL", "word tokens correct");
       }
     } catch (e) {
       console.warn("Self-tests had an issue:", e);
@@ -366,7 +429,6 @@
     return [x * c - y * s, x * s + y * c];
   };
 
-  // Transition easing helpers
   function easeInPow(t, p) {
     const tt = clamp01(t);
     return Math.pow(tt, Math.max(1e-3, p));
@@ -375,6 +437,10 @@
     const tt = clamp01(t);
     const pp = Math.max(1e-3, p);
     return 1 - Math.pow(1 - tt, pp);
+  }
+
+  function motionTime(tSeconds) {
+    return tSeconds * (CONFIG.invertDirection ? -1 : 1);
   }
 
   function hash2(x, y) {
@@ -416,7 +482,7 @@
   }
 
   // ======================================================
-  //  Time (pause/resume)
+  //  Time
   // ======================================================
   const Time = {
     start: performance.now(),
@@ -441,10 +507,10 @@
   };
 
   // ======================================================
-  //  Entrance / Exit controller (smooth: opacity + distance)
+  //  Entrance / Exit controller
   // ======================================================
   const Transition = {
-    value: 1,        // current visibility 0..1 (already eased)
+    value: 1,
     from: 1,
     to: 1,
     t0: 0,
@@ -512,7 +578,7 @@
 
     const preset = CONFIG.preset;
 
-    if (preset === "Tunnel") {
+    if (preset === "Tunnel Drive") {
       const depth = 0.15 + 3.8 * Math.pow(1 - clamp01(rr), 1.9);
       z = depth + 0.55 * wig;
       const tw = (1 - rr) * CONFIG.swirl;
@@ -521,7 +587,7 @@
       x = x * (1 + 0.25 * CONFIG.warp * rr * rr);
       y = y * (1 + 0.10 * CONFIG.warp * rr);
 
-    } else if (preset === "Sphere") {
+    } else if (preset === "Sphere Drift") {
       const theta = u * Math.PI;
       const phi = v * (Math.PI * 0.52);
       const cx = Math.cos(phi) * Math.sin(theta);
@@ -531,9 +597,7 @@
       const ay = t * 0.42 * CONFIG.speed;
       const ax = 0.55 + 0.22 * Math.sin(t * 0.35);
 
-      let X = cx;
-      let Y = cy;
-      let Z = cz;
+      let X = cx, Y = cy, Z = cz;
       [X, Z] = rot2(X, Z, ay);
       [Y, Z] = rot2(Y, Z, ax);
 
@@ -541,19 +605,208 @@
       y = Y * (1 + 0.12 * wig);
       z = 1.45 + Z * 1.45;
 
-    } else if (preset === "Vortex") {
+    } else if (preset === "Box Drift") {
+      const theta = u * Math.PI;
+      const phi = v * (Math.PI * 0.52);
+      let X = Math.cos(phi) * Math.cos(theta);
+      let Y = Math.sin(phi);
+      let Z = Math.cos(phi) * Math.sin(theta);
+
+      const m = Math.max(Math.abs(X), Math.abs(Y), Math.abs(Z)) || 1;
+      X /= m; Y /= m; Z /= m;
+
+      const ay = t * 0.48 * CONFIG.speed;
+      const ax = 0.78 + 0.18 * Math.sin(t * 0.31);
+      const az2 = t * 0.16 * CONFIG.speed;
+      [X, Z] = rot2(X, Z, ay);
+      [Y, Z] = rot2(Y, Z, ax);
+      [X, Y] = rot2(X, Y, az2);
+
+      // Match Sphere Drift "zoom" feel
+      x = X * (1 + 0.12 * wig);
+      y = Y * (1 + 0.12 * wig);
+      z = 1.45 + Z * 1.45 + 0.20 * Math.sin(t * 0.9 + rr * 5.0);
+
+    } else if (preset === "Football Drift") {
+      const theta = u * Math.PI;
+      const z0 = clamp01((v + 1) * 0.5) * 2 - 1;
+
+      const halfLen = CONFIG.footballHalfLen;
+      const pointiness = Math.max(0.6, CONFIG.footballPointiness);
+      const taperPow = Math.max(0.2, CONFIG.footballTaperPow);
+      const squashY = Math.max(0.45, CONFIG.footballSquashY);
+      const squashZ = Math.max(0.20, CONFIG.footballSquashZ);
+
+      const az = Math.min(1, Math.abs(z0));
+      const rProfile = Math.pow(Math.max(0, 1 - Math.pow(az, pointiness)), taperPow);
+
+      let X = z0 * halfLen;
+      const squashYZ = 0.5 * (squashY + squashZ);
+      let Y = rProfile * Math.cos(theta) * squashYZ;
+      let Z = rProfile * Math.sin(theta) * squashYZ;
+
+      const roll = t * 1.25 * CONFIG.speed;
+      [Y, Z] = rot2(Y, Z, roll);
+      Z *= (CONFIG.footballDepthBoost || 1.0);
+
+      const yaw = CONFIG.footballYawAmp * Math.sin(t * 0.55 * CONFIG.speed);
+      const pitch = CONFIG.footballPitchAmp * Math.sin(t * 0.40 * CONFIG.speed);
+      [X, Z] = rot2(X, Z, yaw);
+      [X, Y] = rot2(X, Y, pitch);
+
+      x = X;
+      y = Y;
+      z = 1.22 + Z * 1.35;
+
+    } else if (preset === "Football Vertical") {
+      const theta = u * Math.PI;
+      const y0 = clamp01((v + 1) * 0.5) * 2 - 1;
+
+      const halfLen = CONFIG.footballHalfLen;
+      const pointiness = Math.max(0.6, CONFIG.footballPointiness);
+      const taperPow = Math.max(0.2, CONFIG.footballTaperPow);
+      const squashY = Math.max(0.45, CONFIG.footballSquashY);
+      const squashZ = Math.max(0.20, CONFIG.footballSquashZ);
+
+      const ay = Math.min(1, Math.abs(y0));
+      const rProfile = Math.pow(Math.max(0, 1 - Math.pow(ay, pointiness)), taperPow);
+
+      let Y = y0 * halfLen;
+      const squashXZ = 0.5 * (squashY + squashZ);
+      let X = rProfile * Math.cos(theta) * squashXZ;
+      let Z = rProfile * Math.sin(theta) * squashXZ;
+
+      const roll = t * 1.25 * CONFIG.speed;
+      [X, Z] = rot2(X, Z, roll);
+      Z *= (CONFIG.footballDepthBoost || 1.0);
+
+      const yaw = CONFIG.footballYawAmp * Math.sin(t * 0.55 * CONFIG.speed);
+      const pitch = CONFIG.footballPitchAmp * Math.sin(t * 0.40 * CONFIG.speed);
+      [Y, Z] = rot2(Y, Z, yaw);
+      [X, Y] = rot2(X, Y, pitch);
+
+      x = X;
+      y = Y;
+      z = 1.22 + Z * 1.35;
+
+    } else if (preset === "Torus Drift") {
+      const theta = u * Math.PI;
+      const phi = v * Math.PI;
+      const R = 1.0;
+      const r0 = 0.38;
+      const ct = Math.cos(theta), st = Math.sin(theta);
+      const cp = Math.cos(phi), sp = Math.sin(phi);
+      const rad = R + r0 * cp;
+
+      let X = rad * ct;
+      let Y = rad * st;
+      let Z = r0 * sp;
+
+      const ay = t * 0.55 * CONFIG.speed;
+      const ax = 0.85 + 0.25 * Math.sin(t * 0.27);
+      const az2 = t * 0.18 * CONFIG.speed;
+      [X, Z] = rot2(X, Z, ay);
+      [Y, Z] = rot2(Y, Z, ax);
+      [X, Y] = rot2(X, Y, az2);
+
+      x = X * (0.78 + 0.10 * wig);
+      y = Y * (0.78 + 0.10 * wig);
+      z = 1.35 + Z * 1.55 + 0.25 * Math.sin(t * 0.8 + rr * 6.0);
+
+    } else if (preset === "Cylinder Spin") {
+      const theta = u * Math.PI;
+      let X = Math.cos(theta);
+      let Z = Math.sin(theta);
+      let Y = v;
+
+      const twist = (0.65 + 0.35 * Math.sin(t * 0.6)) * (0.35 + 0.65 * CONFIG.swirl);
+      const a = twist * Y + t * 0.45 * CONFIG.speed;
+      [X, Z] = rot2(X, Z, a);
+
+      const ay = t * 0.50 * CONFIG.speed;
+      const ax = 0.65 + 0.25 * Math.sin(t * 0.22);
+      [X, Z] = rot2(X, Z, ay);
+      [Y, Z] = rot2(Y, Z, ax);
+
+      x = X * (0.92 + 0.10 * wig);
+      y = Y * (0.86 + 0.10 * wig);
+      z = 1.45 + Z * 1.35 + 0.35 * Math.sin((Y * 2.2 + t) * 1.2);
+
+    } else if (preset === "Twisted Tall Cube") {
+      // Tall cube (square perimeter) with torsion along height
+      const p = clamp01((u + 1) * 0.5);
+      const y0 = clamp01((v + 1) * 0.5) * 2 - 1;
+
+      const halfW = Math.max(0.1, CONFIG.prismWidth);
+      const halfH = Math.max(0.2, CONFIG.prismHeight) * 0.5;
+
+      const s = p * 4;
+      const seg = Math.floor(s);
+      const tt = s - seg;
+
+      let X = 0, Z = 0;
+      if (seg === 0) { X = +halfW; Z = lerp(-halfW, +halfW, tt); }
+      else if (seg === 1) { Z = +halfW; X = lerp(+halfW, -halfW, tt); }
+      else if (seg === 2) { X = -halfW; Z = lerp(+halfW, -halfW, tt); }
+      else { Z = -halfW; X = lerp(-halfW, +halfW, tt); }
+
+      let Y = y0 * halfH;
+
+      const tors = (CONFIG.torsionA) * (y0 * 1.25) + t * 0.35 * CONFIG.torsionSpeed;
+      [X, Z] = rot2(X, Z, tors);
+
+      const tors2 = (CONFIG.torsionB) * Math.sin(t * 0.55 * CONFIG.torsionSpeed + y0 * 2.2);
+      [X, Z] = rot2(X, Z, tors2);
+
+      const yaw = 0.25 * Math.sin(t * 0.22 * CONFIG.speed);
+      const pitch = 0.65 + 0.12 * Math.sin(t * 0.18);
+      [X, Z] = rot2(X, Z, yaw);
+      [Y, Z] = rot2(Y, Z, pitch);
+
+      x = X;
+      y = Y;
+      z = 1.25 + Z * 1.35;
+
+    } else if (preset === "Twisted Cylinder") {
+      // Twisted cylinder with torsion along height
+      const theta = u * Math.PI;
+      const y0 = clamp01((v + 1) * 0.5) * 2 - 1;
+
+      const R = Math.max(0.12, CONFIG.dillRadius);
+      const halfLen = Math.max(0.25, CONFIG.dillHalfLen);
+
+      let X = Math.cos(theta) * R;
+      let Z = Math.sin(theta) * R;
+      let Y = y0 * halfLen;
+
+      const tors = (CONFIG.torsionA * 0.95) * (y0 * 1.35) + t * 0.42 * CONFIG.torsionSpeed;
+      [X, Z] = rot2(X, Z, tors);
+
+      const tors2 = (CONFIG.torsionB * 0.75) * Math.sin(t * 0.70 * CONFIG.torsionSpeed + y0 * 2.8);
+      [X, Z] = rot2(X, Z, tors2);
+
+      const yaw = 0.22 * Math.sin(t * 0.26 * CONFIG.speed);
+      const pitch = 0.70 + 0.14 * Math.sin(t * 0.20);
+      [X, Z] = rot2(X, Z, yaw);
+      [Y, Z] = rot2(Y, Z, pitch);
+
+      x = X;
+      y = Y;
+      z = 1.25 + Z * 1.35;
+
+    } else if (preset === "Vortex Twist") {
       const spin = (1 - rr) * (1 - rr) * (1.8 * CONFIG.swirl);
       const a = spin * 2.3 + t * 0.55 * CONFIG.speed;
       [x, y] = rot2(x, y, a);
       z = 0.35 + 2.2 * (1 - rr) + 0.75 * Math.sin(t * 0.8 + rr * 6 + wig);
 
-    } else if (preset === "Ripple") {
+    } else if (preset === "Ripple Rings") {
       const wv = Math.sin(rr * 10 - t * 1.35 * CONFIG.speed);
       z = 0.55 + 2.2 * (1 - rr) + 0.95 * wv * CONFIG.warp;
       const a = 0.7 * wv * CONFIG.swirl;
       [x, y] = rot2(x, y, a);
 
-    } else if (preset === "WavePlane") {
+    } else if (preset === "Wave Grid") {
       z = 0.55
         + 0.85 * Math.sin((u * 2.2 + t * 0.9 * CONFIG.speed))
         + 0.85 * Math.sin((v * 2.0 - t * 0.7 * CONFIG.speed));
@@ -561,7 +814,7 @@
       x = u + 0.12 * wig;
       y = v + 0.10 * wig;
 
-    } else if (preset === "Orbit") {
+    } else if (preset === "Orbit Spotlight") {
       const a = t * 0.35 * CONFIG.speed;
       const ox = 0.35 * Math.cos(a);
       const oy = 0.25 * Math.sin(a * 1.2);
@@ -569,6 +822,136 @@
       z = 0.4 + 2.8 * Math.pow(clamp01(1 - d), 2.2) + 0.55 * wig;
       const sw = CONFIG.swirl * (1 - clamp01(d));
       [x, y] = rot2(u, v, sw * 1.6 + a);
+
+    } else if (preset === "Helix Coil") {
+      const rr2 = rr * rr;
+      const theta = Math.atan2(v, u);
+      const tw = 1.35 * (1 - rr);
+      const spin = theta * 4.5 + t * 0.9 * CONFIG.speed;
+      const wave = Math.sin(spin + rr * 2.2 * 3.2);
+      z = 0.35 + 3.2 * Math.pow(1 - rr, 1.7) + wave * 0.85 * CONFIG.warp;
+      const a = tw * 2.2 + 0.6 * wave * CONFIG.swirl + rr2 * 0.35 * Math.sin(t * 0.7);
+      [x, y] = rot2(u, v, a);
+      x += 0.10 * wig;
+      y += 0.10 * wig;
+
+    } else if (preset === "Crumple Noise") {
+      const n0 = fbm(u * 2.2 + t * 0.10, v * 2.2 - t * 0.08, Math.max(2, CONFIG.fbmOctaves));
+      const n1 = fbm(u * 4.1 - t * 0.06, v * 4.1 + t * 0.07, Math.max(2, CONFIG.fbmOctaves));
+      const cr = (n0 - 0.5) + 0.55 * (n1 - 0.5);
+      const amt = CONFIG.warp;
+      x = u + cr * 0.20 * amt;
+      y = v + cr * 0.18 * amt;
+      z = 0.55 + 2.35 * (1 - rr) + cr * 1.45 * amt;
+
+    } else if (preset === "Lens Breath") {
+      const breath = 0.5 + 0.5 * Math.sin(t * 0.75 * CONFIG.speed);
+      const k2 = 1 + 0.85 * (1 - rr) * (1 - rr) * (0.25 + 0.75 * breath);
+      x = u * k2 + 0.08 * wig;
+      y = v * k2 + 0.08 * wig;
+      z = 0.45 + 2.6 * (1 - rr) + 0.55 * Math.sin((u * 1.2 + v * 1.1) * 2.2 - t * 0.9);
+
+    } else if (preset === "Starburst") {
+      const spokes = 16;
+      const th = Math.atan2(v, u);
+      const spoke = 0.5 + 0.5 * Math.sin(th * spokes + t * 1.25 * CONFIG.speed);
+      const pulse = 0.5 + 0.5 * Math.sin(t * 0.9 * CONFIG.speed);
+      z = 0.5 + 2.6 * (1 - rr) + (spoke - 0.5) * 1.6 * CONFIG.warp * (0.35 + 0.65 * pulse);
+      const a = (spoke - 0.5) * 1.25 * CONFIG.swirl + 0.15 * Math.sin(t * 0.7);
+      [x, y] = rot2(u, v, a);
+      x += 0.10 * wig;
+      y += 0.10 * wig;
+
+    } else if (preset === "Shock Rings") {
+      const shock = Math.sin(rr * 14 - t * 2.4 * CONFIG.speed);
+      const center = Math.pow(1 - rr, 2.4);
+      z = 0.45 + 2.9 * (1 - rr) + shock * 1.1 * CONFIG.warp * (0.35 + 0.65 * center);
+      const a = (0.9 * shock * CONFIG.swirl + 0.6 * center * CONFIG.swirl) * (0.8 + 0.2 * Math.sin(t * 0.7));
+      [x, y] = rot2(u, v, a);
+      x += 0.09 * wig;
+      y += 0.09 * wig;
+
+    } else if (preset === "Spiral Surge") {
+      const th = Math.atan2(v, u);
+      const spiral = th * 1.8 + (1 - rr) * 3.5 + t * 1.10 * CONFIG.speed;
+      const wave = Math.sin(spiral);
+      z = 0.55 + 3.0 * Math.pow(1 - rr, 1.6) + wave * 0.95 * CONFIG.warp;
+      const a = (1 - rr) * (1.9 * CONFIG.swirl) + wave * 0.55 * CONFIG.swirl;
+      [x, y] = rot2(u, v, a);
+      x += 0.10 * wig;
+      y += 0.10 * wig;
+
+    } else if (preset === "Punch Drive") {
+      const depth = 0.18 + 4.2 * Math.pow(1 - rr, 2.0);
+      const p = Math.sin(t * 1.35 * CONFIG.speed + rr * 7.0);
+      z = depth + 0.55 * wig + p * 0.85 * CONFIG.warp * (0.35 + 0.65 * (1 - rr));
+      const a = (1 - rr) * CONFIG.swirl * (1.25 + 0.30 * p);
+      [x, y] = rot2(u, v, a);
+      x += 0.08 * wig;
+      y += 0.08 * wig;
+
+    } else if (preset === "Clock Sweep") {
+      const th = Math.atan2(v, u);
+      const sweep = t * 0.85 * CONFIG.speed;
+      const hand = Math.cos(th - sweep);
+      const band = Math.exp(-Math.pow(rr * 3.2, 2));
+      z = 0.65 + 2.4 * (1 - rr) + hand * 0.55 * CONFIG.warp * (0.25 + 0.75 * band);
+      const a = (hand * 0.35 * CONFIG.swirl) + (0.25 * (1 - rr) * CONFIG.swirl) * Math.sin(t * 0.55);
+      [x, y] = rot2(u + 0.06 * wig, v + 0.06 * wig, a);
+
+    } else if (preset === "Spot Pulse") {
+      const p1 = Math.sin(t * 1.15 * CONFIG.speed - rr * 9.5);
+      const p2 = Math.sin(t * 0.85 * CONFIG.speed + (u * 1.2 - v * 0.9) * 2.0);
+      const wv = (0.65 * p1 + 0.35 * p2);
+      z = 0.70 + 2.35 * (1 - rr) + wv * 0.70 * CONFIG.warp;
+      const a = wv * 0.55 * CONFIG.swirl;
+      [x, y] = rot2(u + 0.08 * wig, v + 0.08 * wig, a);
+
+    } else if (preset === "Diagonal Sweep") {
+      const f = 2.7;
+      const s1 = Math.sin((u * 1.55 + v * 1.05) * f + t * 1.10 * CONFIG.speed);
+      const s2 = Math.sin((v * 1.85 - u * 0.75) * (f * 0.95) - t * 0.92 * CONFIG.speed);
+      const wv = (s1 + 0.65 * s2) / 1.65;
+      z = 0.65 + 2.0 * (1 - rr) + wv * 0.85 * CONFIG.warp;
+      const a = wv * 0.45 * CONFIG.swirl;
+      [x, y] = rot2(u + 0.08 * wig, v + 0.08 * wig, a);
+
+    } else if (preset === "Forward Rush") {
+      const rush = Math.sin(t * 1.8 * CONFIG.speed + rr * 6.0);
+      const depth = 0.25 + 4.1 * Math.pow(1 - rr, 2.1);
+      z = depth + rush * 0.75 * CONFIG.warp + 0.45 * wig;
+      const a = (1 - rr) * 1.6 * CONFIG.swirl + 0.35 * rush * CONFIG.swirl;
+      [x, y] = rot2(u, v, a);
+      x = x * (1 + 0.18 * CONFIG.warp * rr);
+      y = y * (1 + 0.10 * CONFIG.warp * rr);
+
+    } else if (preset === "Shockwave") {
+      const shock = Math.sin(rr * 14.5 - t * 1.65 * CONFIG.speed);
+      const damp = Math.exp(-rr * 1.35);
+      z = 0.55 + 2.7 * (1 - rr) + shock * damp * 1.25 * CONFIG.warp + 0.35 * wig;
+      const a = shock * damp * 0.95 * CONFIG.swirl;
+      [x, y] = rot2(u, v, a);
+      x += 0.08 * wig;
+      y += 0.08 * wig;
+
+    } else if (preset === "Rebound Pulse") {
+      const pulse1 = Math.sin(rr * 10 - t * 1.6 * CONFIG.speed);
+      const pulse2 = Math.sin(rr * 14 - t * 2.2 * CONFIG.speed + 1.2);
+      const wv = 0.6 * pulse1 + 0.4 * pulse2;
+      const center = Math.pow(1 - rr, 2.0);
+      z = 0.55 + 2.8 * (1 - rr) + wv * 1.05 * CONFIG.warp * (0.4 + 0.6 * center);
+      const a = wv * 0.85 * CONFIG.swirl * (0.5 + 0.5 * center);
+      [x, y] = rot2(u + 0.09 * wig, v + 0.09 * wig, a);
+
+    } else if (preset === "Wave Interference") {
+      const f = 2.6;
+      const w1 = Math.sin((u * f + v * 0.65) * 2.1 + t * 1.10 * CONFIG.speed);
+      const w2 = Math.sin((v * f - u * 0.55) * 2.3 - t * 0.92 * CONFIG.speed);
+      const w3 = Math.sin((u + v) * 3.4 + t * 0.55);
+      const wv = (w1 + 0.8 * w2 + 0.6 * w3) / 2.4;
+      z = 0.55 + 2.25 * (1 - rr) + wv * 1.25 * CONFIG.warp;
+      const a = wv * 0.9 * CONFIG.swirl;
+      [x, y] = rot2(u + 0.10 * wig, v + 0.10 * wig, a);
     }
 
     const persp = Math.max(0, CONFIG.perspective) * 0.85;
@@ -580,7 +963,6 @@
     const depth01 = clamp01(1 - k);
     const size = lerp(1.65, 0.55, depth01);
 
-    // Adjustable depth fade: lower power = brighter deep marks (lets you hit 255 even with high perspective)
     const depthFactor = Math.pow(depth01, Math.max(0.01, CONFIG.depthFadePower));
     const a01 = lerp(1.0, 0.18, depthFactor);
 
@@ -618,18 +1000,22 @@
 
   function setupUI(restartFn, clearFn, resizeFn, inFn, outFn) {
     const presetEl = requireEl("preset");
-    const renderEl = requireEl("renderMode");
+    const modeEl = requireEl("mode");
     const densityEl = requireEl("density");
     const scaleEl = requireEl("scale");
     const sizeEl = requireEl("size");
     const thickEl = requireEl("thick");
     const copiesEl = requireEl("copies");
     const speedEl = requireEl("speed");
+    const invertEl = requireEl("invert");
     const tiltEl = requireEl("tilt");
     const warpEl = requireEl("warp");
     const perspEl = requireEl("persp");
     const depthFadeEl = requireEl("depthFade");
     const swirlEl = requireEl("swirl");
+    const torsionAEl = requireEl("torsionA");
+    const torsionBEl = requireEl("torsionB");
+    const torsionSpeedEl = requireEl("torsionSpeed");
     const trailEl = requireEl("trail");
     const grainEl = requireEl("grain");
     const fontEl = requireEl("font");
@@ -641,6 +1027,24 @@
     const clearBtn = requireEl("clear");
     const hideBtn = requireEl("hideBtn");
     const showBtn = requireEl("showUI");
+
+    const rowTorsionA = document.getElementById("row-torsionA");
+    const rowTorsionB = document.getElementById("row-torsionB");
+    const rowTorsionSpeed = document.getElementById("row-torsionSpeed");
+
+    function setRowEnabled(row, enabled) {
+      if (!row) return;
+      row.style.opacity = enabled ? "1" : "0.32";
+      row.style.pointerEvents = enabled ? "auto" : "none";
+      row.querySelectorAll("input, select").forEach(el => { el.disabled = !enabled; });
+    }
+
+    function applyPresetUI() {
+      const torsionOn = (CONFIG.preset === "Twisted Tall Cube" || CONFIG.preset === "Twisted Cylinder");
+      setRowEnabled(rowTorsionA, torsionOn);
+      setRowEnabled(rowTorsionB, torsionOn);
+      setRowEnabled(rowTorsionSpeed, torsionOn);
+    }
 
     presetEl.innerHTML = "";
     for (const p of CONFIG.presets) {
@@ -662,28 +1066,42 @@
       opt.textContent = name;
       fontEl.appendChild(opt);
     }
-    // Ensure current font exists as an option
-    if (CONFIG.glyphFont && !seenFonts.has(CONFIG.glyphFont)) {
-      const opt = document.createElement("option");
-      opt.value = CONFIG.glyphFont;
-      opt.textContent = CONFIG.glyphFont;
-      fontEl.insertBefore(opt, fontEl.firstChild);
+
+    function setMode(m) {
+      CONFIG.mode = m;
+      if (m === "line") {
+        CONFIG.renderMode = "line";
+        CONFIG.patternMode = "glyph";
+      } else if (m === "word") {
+        CONFIG.renderMode = "glyph";
+        CONFIG.patternMode = "word";
+      } else {
+        CONFIG.renderMode = "glyph";
+        CONFIG.patternMode = "glyph";
+      }
     }
 
     function syncToInputs() {
       presetEl.value = CONFIG.preset;
-      renderEl.value = CONFIG.renderMode;
+      const m = (CONFIG.renderMode === "line") ? "line" : (CONFIG.patternMode === "word" ? "word" : "glyph");
+      modeEl.value = m;
+      setMode(m);
+
       densityEl.value = String(CONFIG.density);
       scaleEl.value = String(CONFIG.renderScale);
       sizeEl.value = String(CONFIG.glyphSize);
       thickEl.value = String(CONFIG.thickness);
       copiesEl.value = String(CONFIG.copiesPerCell);
       speedEl.value = String(CONFIG.speed);
+      invertEl.checked = !!CONFIG.invertDirection;
       tiltEl.value = String(CONFIG.fieldRotation);
       warpEl.value = String(CONFIG.warp);
       perspEl.value = String(CONFIG.perspective);
       depthFadeEl.value = String(CONFIG.depthFadePower);
       swirlEl.value = String(CONFIG.swirl);
+      torsionAEl.value = String(CONFIG.torsionA);
+      torsionBEl.value = String(CONFIG.torsionB);
+      torsionSpeedEl.value = String(CONFIG.torsionSpeed);
       trailEl.value = String(CONFIG.trailsAlpha);
       grainEl.value = String(CONFIG.grain);
       fontEl.value = String(CONFIG.glyphFont);
@@ -694,15 +1112,25 @@
     function parseTextArea() {
       const parsed = parseTextBlock(textEl.value);
       CONFIG.glyphs = parsed.glyphs;
+      CONFIG.words = parsed.words;
       CONFIG.overlayLines = parsed.overlays;
     }
 
     syncToInputs();
     parseTextArea();
     setUIVisible(CONFIG.uiVisible);
+    applyPresetUI();
 
-    presetEl.addEventListener("change", () => { CONFIG.preset = presetEl.value; restartFn(); });
-    renderEl.addEventListener("change", () => { CONFIG.renderMode = renderEl.value; });
+    presetEl.addEventListener("change", () => {
+      CONFIG.preset = presetEl.value;
+      applyPresetUI();
+      restartFn();
+    });
+
+    modeEl.addEventListener("change", () => {
+      setMode(modeEl.value);
+      clearFn();
+    });
 
     densityEl.addEventListener("input", () => { CONFIG.density = parseInt(densityEl.value, 10); });
     scaleEl.addEventListener("input", () => {
@@ -713,19 +1141,25 @@
     thickEl.addEventListener("input", () => { CONFIG.thickness = parseFloat(thickEl.value); });
     copiesEl.addEventListener("input", () => { CONFIG.copiesPerCell = parseInt(copiesEl.value, 10); });
     speedEl.addEventListener("input", () => { CONFIG.speed = parseFloat(speedEl.value); });
+    invertEl.addEventListener("change", () => { CONFIG.invertDirection = !!invertEl.checked; });
     tiltEl.addEventListener("input", () => { CONFIG.fieldRotation = parseFloat(tiltEl.value); });
     warpEl.addEventListener("input", () => { CONFIG.warp = parseFloat(warpEl.value); });
     perspEl.addEventListener("input", () => { CONFIG.perspective = parseFloat(perspEl.value); });
     depthFadeEl.addEventListener("input", () => { CONFIG.depthFadePower = parseFloat(depthFadeEl.value); });
     swirlEl.addEventListener("input", () => { CONFIG.swirl = parseFloat(swirlEl.value); });
+
+    torsionAEl.addEventListener("input", () => { CONFIG.torsionA = parseFloat(torsionAEl.value); });
+    torsionBEl.addEventListener("input", () => { CONFIG.torsionB = parseFloat(torsionBEl.value); });
+    torsionSpeedEl.addEventListener("input", () => { CONFIG.torsionSpeed = parseFloat(torsionSpeedEl.value); });
+
     trailEl.addEventListener("input", () => { CONFIG.trailsAlpha = parseInt(trailEl.value, 10); });
     grainEl.addEventListener("input", () => { CONFIG.grain = parseFloat(grainEl.value); });
+    vignetteEl.addEventListener("input", () => { CONFIG.vignette = parseFloat(vignetteEl.value); resizeFn(); });
+
     fontEl.addEventListener("change", () => {
       CONFIG.glyphFont = fontEl.value;
-      // Clear trails so the new font is immediately visible
       clearFn();
     });
-    vignetteEl.addEventListener("input", () => { CONFIG.vignette = parseFloat(vignetteEl.value); resizeFn(); });
 
     textEl.addEventListener("input", () => { parseTextArea(); });
 
@@ -739,7 +1173,7 @@
     showBtn.addEventListener("click", () => setUIVisible(true));
 
     return {
-      syncPreset() { presetEl.value = CONFIG.preset; },
+      syncPreset() { presetEl.value = CONFIG.preset; applyPresetUI(); },
       setFPS(v) {
         const fpsEl = document.getElementById("fps");
         if (fpsEl) fpsEl.textContent = v.toFixed(0) + " fps";
@@ -748,9 +1182,15 @@
   }
 
   // ======================================================
-  //  Glyph selection
+  //  Token selection (glyph char OR word token)
   // ======================================================
-  function pickGlyph(index) {
+  function pickToken(index) {
+    if (CONFIG.patternMode === "word") {
+      const arr = Array.isArray(CONFIG.words) && CONFIG.words.length ? CONFIG.words : ["/"];
+      const i = ((index % arr.length) + arr.length) % arr.length;
+      return String(arr[i]);
+    }
+    // Default: glyph-mode (character pattern, including spaces)
     const s = (CONFIG.glyphs && String(CONFIG.glyphs).length) ? String(CONFIG.glyphs) : "/";
     const i = ((index % s.length) + s.length) % s.length;
     return s.charAt(i);
@@ -771,7 +1211,7 @@
   }
 
   // ======================================================
-  //  Keybinds
+  //  Keybinds (disabled while typing)
   // ======================================================
   function attachKeybinds(syncPresetFn, onScreenshot, onClear, onIn, onOut) {
     function isTypingInField(evt) {
@@ -804,25 +1244,14 @@
         e.preventDefault();
         return;
       }
-      if (e.key && e.key.toLowerCase() === "s") {
-        onScreenshot();
-        return;
-      }
-      if (e.key && e.key.toLowerCase() === "c") {
-        onClear();
-        return;
-      }
-      if (e.key && e.key.toLowerCase() === "i") {
-        if (typeof onIn === "function") onIn();
-        return;
-      }
-      if (e.key && e.key.toLowerCase() === "o") {
-        if (typeof onOut === "function") onOut();
-        return;
-      }
+      if (e.key && e.key.toLowerCase() === "s") { onScreenshot(); return; }
+      if (e.key && e.key.toLowerCase() === "c") { onClear(); return; }
+      if (e.key && e.key.toLowerCase() === "i") { if (typeof onIn === "function") onIn(); return; }
+      if (e.key && e.key.toLowerCase() === "o") { if (typeof onOut === "function") onOut(); return; }
 
       const k = parseInt(e.key, 10);
-      if (k >= 1 && k <= CONFIG.presets.length) {
+      const maxHotkey = Math.min(9, CONFIG.presets.length);
+      if (k >= 1 && k <= maxHotkey) {
         CONFIG.preset = CONFIG.presets[k - 1];
         syncPresetFn();
         Time.reset();
@@ -900,7 +1329,8 @@
       const maxS = Math.max(minS, CONFIG.glyphSpriteMax | 0);
       const qs = Math.max(minS, Math.min(maxS, qSize | 0));
 
-      const key = ch + "|" + qs + "|" + glyphCacheSig;
+      const text = String(ch);
+      const key = text + "|" + qs + "|" + glyphCacheSig;
       const found = cacheGet(key);
       if (found) return found;
 
@@ -916,13 +1346,21 @@
       g.noStroke();
       g.fill(255);
 
+      // Auto-fit multi-character tokens (word-mode) into the sprite width
+      const maxW = dim * 0.92;
+      const tw = g.textWidth(text);
+      if (tw > maxW && tw > 1) {
+        const scale = maxW / tw;
+        g.textSize(Math.max(4, qs * scale));
+      }
+
       const passes = Math.max(1, Math.round(CONFIG.thickness));
       const spread = Math.min(2.6, 0.18 * passes);
       for (let i = 0; i < passes; i++) {
         const a = (i / passes) * TAU;
         const dx = Math.cos(a) * spread;
         const dy = Math.sin(a) * spread;
-        g.text(ch, dim / 2 + dx, dim / 2 + dy);
+        g.text(text, dim / 2 + dx, dim / 2 + dy);
       }
 
       cacheSet(key, g);
@@ -938,13 +1376,15 @@
       const w = p.width, h = p.height;
       const g = p.createGraphics(w, h);
       g.pixelDensity(1);
+      g.clear();
       const ctx = g.drawingContext;
       const cx = w / 2, cy = h / 2;
       const r0 = Math.min(w, h) * 0.12;
       const r1 = Math.max(w, h) * 0.72;
       const grad = ctx.createRadialGradient(cx, cy, r0, cx, cy, r1);
       grad.addColorStop(0, "rgba(0,0,0,0)");
-      grad.addColorStop(1, "rgba(0,0,0," + (0.78 * v) + ")");
+      grad.addColorStop(1, "rgba(0,0,0," + (0.85 * v) + ")");
+      ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
       vignetteG = g;
@@ -992,7 +1432,6 @@
       p.blendMode(p.OVERLAY);
       p.tint(255, 255 * Math.min(1, g));
       p.imageMode(p.CORNER);
-
       const s = grainTile.width;
       for (let y = 0; y < p.height; y += s) {
         for (let x = 0; x < p.width; x += s) {
@@ -1039,9 +1478,9 @@
       g.pop();
     }
 
-    function drawGlyphMark(p, g, cx, cy, sizePx, angle, alpha, glyph) {
+    function drawGlyphMark(p, g, cx, cy, sizePx, angle, alpha, token) {
       const q = quantizeSize(sizePx);
-      const sprite = getGlyphSprite(p, glyph, q);
+      const sprite = getGlyphSprite(p, token, q);
       const dim = sprite.width;
       const scale = sizePx / q;
 
@@ -1096,12 +1535,12 @@
         rebuildGrainTile(p);
         p.background(0);
 
-        // Default textarea content
         const tEl = document.getElementById("text");
         if (tEl && !tEl.value) {
-          tEl.value = "/ \\nSlash Fields";
+          tEl.value = "/\\nSlash Fields";
           const parsed = parseTextBlock(tEl.value);
           CONFIG.glyphs = parsed.glyphs;
+          CONFIG.words = parsed.words;
           CONFIG.overlayLines = parsed.overlays;
         }
       };
@@ -1115,13 +1554,13 @@
       };
 
       p.draw = () => {
-        const t = Time.nowSeconds();
+        const t0 = Time.nowSeconds();
+        const t = motionTime(t0);
         ui.setFPS(p.frameRate());
 
         ensureBuffer(p);
 
-        // Transition updates (value is already eased)
-        Transition.update(t);
+        Transition.update(t0);
         const vis = Transition.value;
         const visAlpha = Math.pow(vis, CONFIG.transitionAlphaPower);
         const posMix = lerp(CONFIG.transitionPosMin, 1.0, vis);
@@ -1147,7 +1586,6 @@
           lastClearRequested = false;
         }
 
-        // Trails
         if (CONFIG.trailsAlpha <= 0) {
           pg.background(0);
         } else {
@@ -1161,7 +1599,6 @@
         const minSide = Math.min(w, h);
         const aspect = w / h;
 
-        // Constant grid size -> no popping
         const cols = Math.floor(CONFIG.density * aspect);
         const rows = Math.floor(CONFIG.density);
         const countX = Math.max(6, cols);
@@ -1174,9 +1611,19 @@
         const copyCount = Math.max(1, Math.min(4, CONFIG.copiesPerCell | 0));
         const spread = clamp01(CONFIG.copySpread);
 
-        if (CONFIG.renderMode === "line") pg.noFill(); else pg.noStroke();
-
         const nnFreq = 2.2;
+
+        // Avoid aspect stretching for 3D objects: feed unscaled u0
+        const is3D = (
+          CONFIG.preset === "Sphere Drift" ||
+          CONFIG.preset === "Box Drift" ||
+          CONFIG.preset === "Football Drift" ||
+          CONFIG.preset === "Football Vertical" ||
+          CONFIG.preset === "Torus Drift" ||
+          CONFIG.preset === "Cylinder Spin" ||
+          CONFIG.preset === "Twisted Tall Cube" ||
+          CONFIG.preset === "Twisted Cylinder"
+        );
 
         for (let j = 0; j < countY; j++) {
           const v = (j / (countY - 1)) * 2 - 1;
@@ -1184,12 +1631,12 @@
             const u0 = (i / (countX - 1)) * 2 - 1;
             const u = u0 * aspect;
 
-            const cell = mapCell(u * zoom, v * zoom, t * CONFIG.speed);
+            const uIn = is3D ? u0 : u;
+            const cell = mapCell(uIn * zoom, v * zoom, t);
 
             const px0 = cx + cell.nx * (minSide * 0.55);
             const py0 = cy + cell.ny * (minSide * 0.55);
 
-            // Contract toward center when hidden (distance feel)
             const px = cx + (px0 - cx) * posMix;
             const py = cy + (py0 - cy) * posMix;
 
@@ -1216,14 +1663,13 @@
               if (CONFIG.renderMode === "line") {
                 drawLineMark(pg, gx, gy, size, baseAng, thick, a);
               } else {
-                const glyph = pickGlyph(i + j * 997 + c * 31);
-                drawGlyphMark(p, pg, gx, gy, size, baseAng, a, glyph);
+                const token = pickToken(i + j * 997 + c * 31);
+                drawGlyphMark(p, pg, gx, gy, size, baseAng, a, token);
               }
             }
           }
         }
 
-        // Present buffer
         p.push();
         p.blendMode(p.BLEND);
         p.imageMode(p.CORNER);
@@ -1231,7 +1677,6 @@
         p.image(pg, 0, 0, p.width, p.height);
         p.pop();
 
-        // Overlays
         if (vignetteG && visAlpha > 0.002) {
           p.push();
           p.blendMode(p.BLEND);
@@ -1244,7 +1689,6 @@
         drawGrainTiled(p, visAlpha);
         drawOverlayText(p, visAlpha);
 
-        // Screenshot flash + save
         if (screenshotFlash > 0) {
           p.push();
           p.noStroke();
@@ -1294,7 +1738,13 @@
       doOut
     );
 
-    attachKeybinds(() => ui.syncPreset(), () => {}, () => { ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); }, doIn, doOut);
+    attachKeybinds(
+      () => ui.syncPreset(),
+      () => {},
+      () => { ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); },
+      doIn,
+      doOut
+    );
 
     function frame() {
       const now = performance.now();
@@ -1303,8 +1753,9 @@
       fpsEMA = fpsEMA * 0.9 + (1000 / dt) * 0.1;
       ui.setFPS(fpsEMA);
 
-      const t = Time.nowSeconds();
-      Transition.update(t);
+      const t0 = Time.nowSeconds();
+      const t = motionTime(t0);
+      Transition.update(t0);
 
       const vis = Transition.value;
       const visAlpha = Math.pow(vis, CONFIG.transitionAlphaPower);
@@ -1342,7 +1793,7 @@
         for (let i = 0; i < countX; i++) {
           const u0 = (i / (countX - 1)) * 2 - 1;
           const u = u0 * aspect;
-          const cell = mapCell(u, v, t * CONFIG.speed);
+          const cell = mapCell(u, v, t);
 
           const px0 = cx + cell.nx * (minSide * 0.55);
           const py0 = cy + cell.ny * (minSide * 0.55);
