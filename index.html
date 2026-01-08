@@ -38,7 +38,17 @@
 
     #ui .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin: 6px 0; }
     #ui label { opacity: 0.9; }
-    #ui input[type="range"], #ui select { width: 210px; }
+    #ui input[type="range"], #ui select, #ui input[type="text"] { width: 210px; }
+
+    #ui input[type="text"] {
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 7px 8px;
+      outline: none;
+      box-sizing: border-box;
+    }
 
     #ui textarea {
       width: 100%;
@@ -159,6 +169,28 @@
     </div>
 
     <div class="row">
+      <label for="emojiPreset">Emoji set</label>
+      <select id="emojiPreset">
+        <option value="manual">— (use Line 1)</option>
+        <option value="🔥">🔥</option>
+        <option value="🏈">🏈</option>
+        <option value="🏒">🏒</option>
+        <option value="🥅">🥅</option>
+        <option value="⚡️">⚡️</option>
+        <option value="✨">✨</option>
+        <option value="💥">💥</option>
+        <option value="🔥⚡️💥">🔥⚡️💥</option>
+        <option value="🏈✨⚡️">🏈✨⚡️</option>
+        <option value="🏒🥅✨">🏒🥅✨</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label for="emojiCustom">Emoji pattern</label>
+      <input id="emojiCustom" type="text" placeholder="Paste emojis…" />
+    </div>
+
+    <div class="row">
       <label for="font">Font</label>
       <select id="font"></select>
     </div>
@@ -169,7 +201,6 @@
     <div class="row" id="row-thick" style="display:none;"><label for="thick">Thickness</label><input id="thick" type="range" min="0" max="10" step="0.1" /></div>
     <div class="row" id="row-copies" style="display:none;"><label for="copies">Copies per cell</label><input id="copies" type="range" min="1" max="4" step="1" /></div>
     <div class="row"><label for="speed">Speed</label><input id="speed" type="range" min="0" max="4" step="0.01" /></div>
-    
 
     <div class="row"><label for="tilt">Field rotation</label><input id="tilt" type="range" min="-1.5" max="1.5" step="0.01" /></div>
     <div class="row"><label for="warp">Warp</label><input id="warp" type="range" min="0" max="2" step="0.01" /></div>
@@ -183,6 +214,7 @@
 
     <div class="row" id="row-trail" style="display:none;"><label for="trail">Trails</label><input id="trail" type="range" min="0" max="255" step="1" /></div>
     <div class="row" id="row-grain" style="display:none;"><label for="grain">Grain</label><input id="grain" type="range" min="0" max="1" step="0.01" /></div>
+
     <div class="row"><label for="vignette">Vignette</label><input id="vignette" type="range" min="0" max="1" step="0.01" /></div>
     <div class="row"><label for="invert">Invert direction</label><input id="invert" type="checkbox" /></div>
 
@@ -223,7 +255,7 @@
     // Glyphs
     glyphs: "/",                // repeating pattern (line 1 in textarea overrides)
     words: ["/"],               // tokenized pattern for word-mode
-    glyphFont: "Phonic",  // CSS font name
+    glyphFont: "Phonic",        // CSS font name
     glyphWeight: 800,
     glyphRotationOffset: 0.0,    // radians
 
@@ -252,7 +284,7 @@
 
     // Tall cube
     prismWidth: 0.78,           // half-width in X/Z
-    prismHeight: 1.34,          // full height
+    prismHeight: 2.34,          // full height
 
     // Cylinder
     dillRadius: 0.78,
@@ -381,6 +413,33 @@
     return Math.max(step, Math.round(px / step) * step);
   }
 
+  // Grapheme splitter (handles emojis + composed glyphs correctly)
+  const _graphemeSeg = (typeof Intl !== "undefined" && Intl.Segmenter)
+    ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+    : null;
+
+  function splitGraphemes(str) {
+    const s = String(str ?? "");
+    if (_graphemeSeg) {
+      const out = [];
+      for (const part of _graphemeSeg.segment(s)) out.push(part.segment);
+      return out;
+    }
+    // Fallback: code points (OK for most emojis, but not all ZWJ sequences)
+    return Array.from(s);
+  }
+
+  // Cached units for CONFIG.glyphs
+  let _glyphUnitsKey = "";
+  let _glyphUnits = ["/"];
+  function refreshGlyphUnits() {
+    const key = String(CONFIG.glyphs ?? "/");
+    if (key === _glyphUnitsKey) return;
+    _glyphUnitsKey = key;
+    const units = splitGraphemes(key);
+    _glyphUnits = units.length ? units : ["/"];
+  }
+
   (function runSelfTests() {
     try {
       console.assert(typeof CONFIG.glyphs === "string" && CONFIG.glyphs.length > 0, "glyphs must be non-empty");
@@ -396,26 +455,42 @@
       console.assert(CONFIG.presets.includes("Twisted Cylinder"), "3D preset Twisted Cylinder present");
 
       {
-        const a = parseTextBlock("/\nHELLO\nWORLD");
+        const a = parseTextBlock(`/${"\n"}HELLO${"\n"}WORLD`);
         console.assert(a.glyphs === "/", "parseTextBlock glyphs");
         console.assert(a.words.length === 1 && a.words[0] === "/", "parseTextBlock words default");
         console.assert(a.overlays.length === 2, "parseTextBlock overlays");
       }
       {
-        const b = parseTextBlock("   \r\nX");
+        const b = parseTextBlock(`   ${"\n"}X`);
         console.assert(b.glyphs === "   ", "spaces-only glyph pattern should be preserved");
         console.assert(b.words.length === 1 && b.words[0] === "/", "spaces-only words should fall back");
-        console.assert(b.overlays[0] === "X", "CRLF handled");
+        console.assert(b.overlays[0] === "X", "overlay parsed");
       }
       {
-        const d = parseTextBlock("TOUCHDOWN GOAL\nTitle");
+        const d = parseTextBlock(`TOUCHDOWN GOAL${"\n"}Title`);
         console.assert(d.words.length === 2, "word split should find 2 tokens");
         console.assert(d.words[0] === "TOUCHDOWN" && d.words[1] === "GOAL", "word tokens correct");
+      }
+      {
+        const units = splitGraphemes("⚡️");
+        if (_graphemeSeg) console.assert(units.length === 1, "grapheme splitter should keep ⚡️ together");
+      }
+      {
+        const old = CONFIG.glyphs;
+        CONFIG.glyphs = "🔥🏈";
+        refreshGlyphUnits();
+        console.assert(_glyphUnits.length >= 2, "emoji glyph units should split into at least 2");
+        CONFIG.glyphs = old;
+        refreshGlyphUnits();
       }
     } catch (e) {
       console.warn("Self-tests had an issue:", e);
     }
   })();
+
+  // Ensure initial glyph units
+  refreshGlyphUnits();
+  try { Object.defineProperty(window, "_glyphUnits", { get: () => _glyphUnits }); } catch (_) {}
 
   // ======================================================
   //  Utilities
@@ -622,7 +697,6 @@
       [Y, Z] = rot2(Y, Z, ax);
       [X, Y] = rot2(X, Y, az2);
 
-      // Match Sphere Drift "zoom" feel
       x = X * (1 + 0.12 * wig);
       y = Y * (1 + 0.12 * wig);
       z = 1.45 + Z * 1.45 + 0.20 * Math.sin(t * 0.9 + rr * 5.0);
@@ -733,7 +807,6 @@
       z = 1.45 + Z * 1.35 + 0.35 * Math.sin((Y * 2.2 + t) * 1.2);
 
     } else if (preset === "Twisted Tall Cube") {
-      // Tall cube (square perimeter) with torsion along height
       const p = clamp01((u + 1) * 0.5);
       const y0 = clamp01((v + 1) * 0.5) * 2 - 1;
 
@@ -768,7 +841,6 @@
       z = 1.25 + Z * 1.35;
 
     } else if (preset === "Twisted Cylinder") {
-      // Twisted cylinder with torsion along height
       const theta = u * Math.PI;
       const y0 = clamp01((v + 1) * 0.5) * 2 - 1;
 
@@ -830,8 +902,8 @@
       const spin = theta * 4.5 + t * 0.9 * CONFIG.speed;
       const wave = Math.sin(spin + rr * 2.2 * 3.2);
       z = 0.35 + 3.2 * Math.pow(1 - rr, 1.7) + wave * 0.85 * CONFIG.warp;
-      const a = tw * 2.2 + 0.6 * wave * CONFIG.swirl + rr2 * 0.35 * Math.sin(t * 0.7);
-      [x, y] = rot2(u, v, a);
+      const aa = tw * 2.2 + 0.6 * wave * CONFIG.swirl + rr2 * 0.35 * Math.sin(t * 0.7);
+      [x, y] = rot2(u, v, aa);
       x += 0.10 * wig;
       y += 0.10 * wig;
 
@@ -857,8 +929,8 @@
       const spoke = 0.5 + 0.5 * Math.sin(th * spokes + t * 1.25 * CONFIG.speed);
       const pulse = 0.5 + 0.5 * Math.sin(t * 0.9 * CONFIG.speed);
       z = 0.5 + 2.6 * (1 - rr) + (spoke - 0.5) * 1.6 * CONFIG.warp * (0.35 + 0.65 * pulse);
-      const a = (spoke - 0.5) * 1.25 * CONFIG.swirl + 0.15 * Math.sin(t * 0.7);
-      [x, y] = rot2(u, v, a);
+      const aa = (spoke - 0.5) * 1.25 * CONFIG.swirl + 0.15 * Math.sin(t * 0.7);
+      [x, y] = rot2(u, v, aa);
       x += 0.10 * wig;
       y += 0.10 * wig;
 
@@ -866,8 +938,8 @@
       const shock = Math.sin(rr * 14 - t * 2.4 * CONFIG.speed);
       const center = Math.pow(1 - rr, 2.4);
       z = 0.45 + 2.9 * (1 - rr) + shock * 1.1 * CONFIG.warp * (0.35 + 0.65 * center);
-      const a = (0.9 * shock * CONFIG.swirl + 0.6 * center * CONFIG.swirl) * (0.8 + 0.2 * Math.sin(t * 0.7));
-      [x, y] = rot2(u, v, a);
+      const aa = (0.9 * shock * CONFIG.swirl + 0.6 * center * CONFIG.swirl) * (0.8 + 0.2 * Math.sin(t * 0.7));
+      [x, y] = rot2(u, v, aa);
       x += 0.09 * wig;
       y += 0.09 * wig;
 
@@ -876,17 +948,17 @@
       const spiral = th * 1.8 + (1 - rr) * 3.5 + t * 1.10 * CONFIG.speed;
       const wave = Math.sin(spiral);
       z = 0.55 + 3.0 * Math.pow(1 - rr, 1.6) + wave * 0.95 * CONFIG.warp;
-      const a = (1 - rr) * (1.9 * CONFIG.swirl) + wave * 0.55 * CONFIG.swirl;
-      [x, y] = rot2(u, v, a);
+      const aa = (1 - rr) * (1.9 * CONFIG.swirl) + wave * 0.55 * CONFIG.swirl;
+      [x, y] = rot2(u, v, aa);
       x += 0.10 * wig;
       y += 0.10 * wig;
 
     } else if (preset === "Punch Drive") {
       const depth = 0.18 + 4.2 * Math.pow(1 - rr, 2.0);
-      const p = Math.sin(t * 1.35 * CONFIG.speed + rr * 7.0);
-      z = depth + 0.55 * wig + p * 0.85 * CONFIG.warp * (0.35 + 0.65 * (1 - rr));
-      const a = (1 - rr) * CONFIG.swirl * (1.25 + 0.30 * p);
-      [x, y] = rot2(u, v, a);
+      const p1 = Math.sin(t * 1.35 * CONFIG.speed + rr * 7.0);
+      z = depth + 0.55 * wig + p1 * 0.85 * CONFIG.warp * (0.35 + 0.65 * (1 - rr));
+      const aa = (1 - rr) * CONFIG.swirl * (1.25 + 0.30 * p1);
+      [x, y] = rot2(u, v, aa);
       x += 0.08 * wig;
       y += 0.08 * wig;
 
@@ -896,16 +968,16 @@
       const hand = Math.cos(th - sweep);
       const band = Math.exp(-Math.pow(rr * 3.2, 2));
       z = 0.65 + 2.4 * (1 - rr) + hand * 0.55 * CONFIG.warp * (0.25 + 0.75 * band);
-      const a = (hand * 0.35 * CONFIG.swirl) + (0.25 * (1 - rr) * CONFIG.swirl) * Math.sin(t * 0.55);
-      [x, y] = rot2(u + 0.06 * wig, v + 0.06 * wig, a);
+      const aa = (hand * 0.35 * CONFIG.swirl) + (0.25 * (1 - rr) * CONFIG.swirl) * Math.sin(t * 0.55);
+      [x, y] = rot2(u + 0.06 * wig, v + 0.06 * wig, aa);
 
     } else if (preset === "Spot Pulse") {
       const p1 = Math.sin(t * 1.15 * CONFIG.speed - rr * 9.5);
       const p2 = Math.sin(t * 0.85 * CONFIG.speed + (u * 1.2 - v * 0.9) * 2.0);
       const wv = (0.65 * p1 + 0.35 * p2);
       z = 0.70 + 2.35 * (1 - rr) + wv * 0.70 * CONFIG.warp;
-      const a = wv * 0.55 * CONFIG.swirl;
-      [x, y] = rot2(u + 0.08 * wig, v + 0.08 * wig, a);
+      const aa = wv * 0.55 * CONFIG.swirl;
+      [x, y] = rot2(u + 0.08 * wig, v + 0.08 * wig, aa);
 
     } else if (preset === "Diagonal Sweep") {
       const f = 2.7;
@@ -913,15 +985,15 @@
       const s2 = Math.sin((v * 1.85 - u * 0.75) * (f * 0.95) - t * 0.92 * CONFIG.speed);
       const wv = (s1 + 0.65 * s2) / 1.65;
       z = 0.65 + 2.0 * (1 - rr) + wv * 0.85 * CONFIG.warp;
-      const a = wv * 0.45 * CONFIG.swirl;
-      [x, y] = rot2(u + 0.08 * wig, v + 0.08 * wig, a);
+      const aa = wv * 0.45 * CONFIG.swirl;
+      [x, y] = rot2(u + 0.08 * wig, v + 0.08 * wig, aa);
 
     } else if (preset === "Forward Rush") {
       const rush = Math.sin(t * 1.8 * CONFIG.speed + rr * 6.0);
       const depth = 0.25 + 4.1 * Math.pow(1 - rr, 2.1);
       z = depth + rush * 0.75 * CONFIG.warp + 0.45 * wig;
-      const a = (1 - rr) * 1.6 * CONFIG.swirl + 0.35 * rush * CONFIG.swirl;
-      [x, y] = rot2(u, v, a);
+      const aa = (1 - rr) * 1.6 * CONFIG.swirl + 0.35 * rush * CONFIG.swirl;
+      [x, y] = rot2(u, v, aa);
       x = x * (1 + 0.18 * CONFIG.warp * rr);
       y = y * (1 + 0.10 * CONFIG.warp * rr);
 
@@ -929,8 +1001,8 @@
       const shock = Math.sin(rr * 14.5 - t * 1.65 * CONFIG.speed);
       const damp = Math.exp(-rr * 1.35);
       z = 0.55 + 2.7 * (1 - rr) + shock * damp * 1.25 * CONFIG.warp + 0.35 * wig;
-      const a = shock * damp * 0.95 * CONFIG.swirl;
-      [x, y] = rot2(u, v, a);
+      const aa = shock * damp * 0.95 * CONFIG.swirl;
+      [x, y] = rot2(u, v, aa);
       x += 0.08 * wig;
       y += 0.08 * wig;
 
@@ -940,8 +1012,8 @@
       const wv = 0.6 * pulse1 + 0.4 * pulse2;
       const center = Math.pow(1 - rr, 2.0);
       z = 0.55 + 2.8 * (1 - rr) + wv * 1.05 * CONFIG.warp * (0.4 + 0.6 * center);
-      const a = wv * 0.85 * CONFIG.swirl * (0.5 + 0.5 * center);
-      [x, y] = rot2(u + 0.09 * wig, v + 0.09 * wig, a);
+      const aa = wv * 0.85 * CONFIG.swirl * (0.5 + 0.5 * center);
+      [x, y] = rot2(u + 0.09 * wig, v + 0.09 * wig, aa);
 
     } else if (preset === "Wave Interference") {
       const f = 2.6;
@@ -950,8 +1022,8 @@
       const w3 = Math.sin((u + v) * 3.4 + t * 0.55);
       const wv = (w1 + 0.8 * w2 + 0.6 * w3) / 2.4;
       z = 0.55 + 2.25 * (1 - rr) + wv * 1.25 * CONFIG.warp;
-      const a = wv * 0.9 * CONFIG.swirl;
-      [x, y] = rot2(u + 0.10 * wig, v + 0.10 * wig, a);
+      const aa = wv * 0.9 * CONFIG.swirl;
+      [x, y] = rot2(u + 0.10 * wig, v + 0.10 * wig, aa);
     }
 
     const persp = Math.max(0, CONFIG.perspective) * 0.85;
@@ -1019,6 +1091,8 @@
     const trailEl = requireEl("trail");
     const grainEl = requireEl("grain");
     const fontEl = requireEl("font");
+    const emojiPresetEl = requireEl("emojiPreset");
+    const emojiCustomEl = requireEl("emojiCustom");
     const vignetteEl = requireEl("vignette");
     const textEl = requireEl("text");
     const inBtn = requireEl("btnIn");
@@ -1054,7 +1128,6 @@
       presetEl.appendChild(opt);
     }
 
-    // Populate font menu
     fontEl.innerHTML = "";
     const seenFonts = new Set();
     for (const f of (CONFIG.fontOptions || [])) {
@@ -1114,9 +1187,11 @@
       CONFIG.glyphs = parsed.glyphs;
       CONFIG.words = parsed.words;
       CONFIG.overlayLines = parsed.overlays;
+      refreshGlyphUnits();
     }
 
     syncToInputs();
+    try { emojiCustomEl.value = String(CONFIG.glyphs ?? ""); } catch (_) {}
     parseTextArea();
     setUIVisible(CONFIG.uiVisible);
     applyPresetUI();
@@ -1161,6 +1236,35 @@
       clearFn();
     });
 
+    function setPatternLine1(value) {
+      const lines = String(textEl.value ?? "").replace(/\r/g, "").split("\n");
+      lines[0] = String(value ?? "");
+      textEl.value = lines.join("\n");
+      parseTextArea();
+      try { emojiCustomEl.value = String(CONFIG.glyphs ?? ""); } catch (_) {}
+      clearFn();
+    }
+
+    emojiPresetEl.addEventListener("change", () => {
+      const v = String(emojiPresetEl.value || "manual");
+      if (v !== "manual") {
+        setPatternLine1(v);
+        emojiPresetEl.value = "manual";
+      }
+    });
+
+    emojiCustomEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        setPatternLine1(emojiCustomEl.value);
+        try { emojiCustomEl.blur(); } catch (_) {}
+      }
+    });
+    emojiCustomEl.addEventListener("blur", () => {
+      const v = String(emojiCustomEl.value ?? "");
+      if (v !== String(CONFIG.glyphs ?? "")) setPatternLine1(v);
+    });
+
     textEl.addEventListener("input", () => { parseTextArea(); });
 
     inBtn.addEventListener("click", () => { if (typeof inFn === "function") inFn(); });
@@ -1190,10 +1294,11 @@
       const i = ((index % arr.length) + arr.length) % arr.length;
       return String(arr[i]);
     }
-    // Default: glyph-mode (character pattern, including spaces)
-    const s = (CONFIG.glyphs && String(CONFIG.glyphs).length) ? String(CONFIG.glyphs) : "/";
-    const i = ((index % s.length) + s.length) % s.length;
-    return s.charAt(i);
+    // Default: glyph-mode (graphemes, including emojis + spaces)
+    refreshGlyphUnits();
+    const arr = _glyphUnits.length ? _glyphUnits : ["/"];
+    const i = ((index % arr.length) + arr.length) % arr.length;
+    return String(arr[i]);
   }
 
   // ======================================================
@@ -1340,7 +1445,7 @@
       g.clear();
 
       g.textAlign(g.CENTER, g.CENTER);
-      g.textFont(CONFIG.glyphFont);
+      g.textFont(String(CONFIG.glyphFont) + ", Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji");
       g.textStyle(g.BOLD);
       g.textSize(qs);
       g.noStroke();
@@ -1350,8 +1455,8 @@
       const maxW = dim * 0.92;
       const tw = g.textWidth(text);
       if (tw > maxW && tw > 1) {
-        const scale = maxW / tw;
-        g.textSize(Math.max(4, qs * scale));
+        const sc = maxW / tw;
+        g.textSize(Math.max(4, qs * sc));
       }
 
       const passes = Math.max(1, Math.round(CONFIG.thickness));
@@ -1398,10 +1503,10 @@
       const img = ctx.createImageData(s, s);
       const data = img.data;
       for (let i = 0; i < data.length; i += 4) {
-        const v = (Math.random() * 255) | 0;
-        data[i] = v;
-        data[i + 1] = v;
-        data[i + 2] = v;
+        const vv = (Math.random() * 255) | 0;
+        data[i] = vv;
+        data[i + 1] = vv;
+        data[i + 2] = vv;
         data[i + 3] = 255;
       }
       ctx.putImageData(img, 0, 0);
@@ -1537,11 +1642,12 @@
 
         const tEl = document.getElementById("text");
         if (tEl && !tEl.value) {
-          tEl.value = "/\\nSlash Fields";
+          tEl.value = "/\nSlash Fields";
           const parsed = parseTextBlock(tEl.value);
           CONFIG.glyphs = parsed.glyphs;
           CONFIG.words = parsed.words;
           CONFIG.overlayLines = parsed.overlays;
+          refreshGlyphUnits();
         }
       };
 
@@ -1613,7 +1719,6 @@
 
         const nnFreq = 2.2;
 
-        // Avoid aspect stretching for 3D objects: feed unscaled u0
         const is3D = (
           CONFIG.preset === "Sphere Drift" ||
           CONFIG.preset === "Box Drift" ||
